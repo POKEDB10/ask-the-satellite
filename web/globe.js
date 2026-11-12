@@ -3,6 +3,7 @@
   const C = window.Cesium;
   const NATIVE_MAX_LEVEL = 19;          // Esri World Imagery over Dubai: level 20+ returns placeholder tiles (measured in P0)
   const ESRI_URL = 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer';
+  const ESRI_KEYED_URL = 'https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer';   // = ArcGisMapService.defaultWorldImageryServer
   const LABELS_URL = 'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer';
   const ORBIT = { lon: 52, lat: 22, h: 2.0e7 };
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -54,19 +55,19 @@
   }
 
   function addEsri(cfg) {
-    // Never-discard: the default policy probes a level-23 tile that 404s; we never request above level 19 anyway.
-    const opts = { maximumLevel: NATIVE_MAX_LEVEL, enablePickFeatures: false, tileDiscardPolicy: new C.NeverTileDiscardPolicy() };
-    let p;
-    if (cfg.arcgis_key) {
-      C.ArcGisMapService.defaultAccessToken = cfg.arcgis_key;
-      p = C.ArcGisMapServerImageryProvider.fromBasemapType(C.ArcGisBaseMapType.SATELLITE, opts);
-    } else p = C.ArcGisMapServerImageryProvider.fromUrl(ESRI_URL, opts);
+    // URL-template tiles, not ArcGisMapServerImageryProvider: that provider ignores maximumLevel on tiled servers and
+    // would request level 20+ placeholders (404) over Dubai. Here Cesium stops at the native level 19 and overzooms.
+    const tiles = cfg.arcgis_key ? `${ESRI_KEYED_URL}/tile/{z}/{y}/{x}?token=${encodeURIComponent(cfg.arcgis_key)}` : `${ESRI_URL}/tile/{z}/{y}/{x}`;
+    const credit = new C.Credit((cfg.attributions && cfg.attributions.esri) || 'Esri, Vantor, Earthstar Geographics, and the GIS User Community');
+    const p = Promise.resolve(new C.UrlTemplateImageryProvider({ url: tiles, maximumLevel: NATIVE_MAX_LEVEL, credit, tilingScheme: new C.WebMercatorTilingScheme() }));
     base.esri = C.ImageryLayer.fromProviderAsync(p);
     base.esri.readyEvent.addEventListener(prov => {
       if (st.esri === 'pending') st.esri = 'ok';
       applyBasemap();
       const errs = [];                                            // 3 tile failures within 15 s = Esri is down
-      prov.errorEvent.addEventListener(() => {
+      prov.errorEvent.addEventListener(e => {
+        const code = e && e.error && e.error.statusCode;
+        if (code === 404) return;                                 // no imagery for that tile (open sea, deep zoom): not an outage
         const t = performance.now(); errs.push(t);
         while (errs.length && t - errs[0] > 15000) errs.shift();
         if (errs.length >= 3 && st.esri === 'ok') esriFailed('tiles');
@@ -74,7 +75,8 @@
     });
     base.esri.errorEvent.addEventListener(() => esriFailed('metadata'));
     viewer.imageryLayers.add(base.esri);
-    base.labels = C.ImageryLayer.fromProviderAsync(C.ArcGisMapServerImageryProvider.fromUrl(LABELS_URL, { enablePickFeatures: false, tileDiscardPolicy: new C.NeverTileDiscardPolicy() }));
+    base.labels = C.ImageryLayer.fromProviderAsync(Promise.resolve(new C.UrlTemplateImageryProvider({
+      url: `${LABELS_URL}/tile/{z}/{y}/{x}`, maximumLevel: NATIVE_MAX_LEVEL, tilingScheme: new C.WebMercatorTilingScheme() })));
     base.labels.errorEvent.addEventListener(() => { base.labels.show = false; });
     viewer.imageryLayers.add(base.labels);
     applyBasemap();
