@@ -270,9 +270,10 @@
         <span class="meta"><span class="why" tabindex="0" title="${esc(whyB)}">Why this scene?</span> · <span class="why" tabindex="0" title="${esc(whyA)}">and this one?</span></span></div>
       <div class="vbar" title="Share of the area measurable on both dates"><i style="width:${Math.max(0, Math.min(100, st.valid_pct_both))}%"></i></div>
       <div class="meta">${st.valid_pct_both}% measurable on both dates · before ${st.valid_pct_before}% · after ${st.valid_pct_after}%</div>
+      <div class="meta">${esc(caption(b))} → ${esc(caption(f))}</div>
       <p style="margin:8px 0 0">${esc(qc.text || '')}</p>
       <div class="chips">${(qc.flags || []).map(x => `<span class="qchip">${esc(x)}</span>`).join('')}
-        ${st.ignored_small_km2 > 0 ? `<span class="qchip">Changes under ${st.min_mapping_unit_px} px ignored: ${st.ignored_small_km2} km²</span>` : ''}
+        ${st.ignored_small_km2 > 0 && !q.headline_hidden ? `<span class="qchip">Changes under ${st.min_mapping_unit_px} px ignored: ${st.ignored_small_km2} km²</span>` : ''}
         <span class="qchip">Analysis ${esc(res)} · basemap high-res, not analysed</span></div>
     </div></div>`;
 
