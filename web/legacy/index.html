@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ask the Satellite</title>
+<link rel="stylesheet" href="leaflet.css"><link rel="stylesheet" href="style.css"></head>
+<body>
+<header><b>Ask the Satellite</b><span id="pill" class="pill">checking...</span><span id="stories"></span><button id="verify">Verify the science</button></header>
+<main>
+  <section id="chat"><div id="log"></div>
+    <form id="ask"><input id="q" dir="auto" autocomplete="off" placeholder="Ask about a place: &quot;Show Palm Jumeirah before and after&quot;"><button>Ask</button></form></section>
+  <section id="mapwrap"><div id="map"></div><div id="divider" title="Drag"></div>
+    <aside id="hud" hidden></aside>
+    <div id="layers" hidden>
+      <label><input type="checkbox" data-l="change" checked> Change</label>
+      <label><input type="checkbox" data-l="mask"> Not measured</label>
+      <span class="key"><i class="g"></i>gain <i class="l"></i>loss <i class="m"></i>not measured</span></div>
+    <div id="attr"></div></section>
+</main>
+<dialog id="modal"></dialog>
+<script src="leaflet.js"></script><script src="map.js"></script><script src="app.js"></script>
+</body></html>
