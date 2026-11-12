@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ask the Satellite</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6.5' fill='none' stroke='%232DD4BF' stroke-width='1.5'/%3E%3Ccircle cx='8' cy='8' r='2' fill='%232DD4BF'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="vendor/cesium/Widgets/widgets.css">
+<link rel="stylesheet" href="style.css">
+<script>window.CESIUM_BASE_URL = '/vendor/cesium/';</script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c2 2 2.6 4 2.6 6.5S10 12.5 8 14.5M8 1.5C6 3.5 5.4 5.5 5.4 8S6 12.5 8 14.5"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 16 16"><path d="M8 2 1.5 5.5 8 9l6.5-3.5zM1.5 8.5 8 12l6.5-3.5M1.5 11 8 14.5l6.5-3.5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16"><path d="M8 1.5 2.5 3.5v4c0 3.2 2.3 5.7 5.5 7 3.2-1.3 5.5-3.8 5.5-7v-4zM5.5 8l2 2 3-3.5"/></symbol>
+  <symbol id="i-tilt" viewBox="0 0 16 16"><path d="M2 12.5h12M4 12.5 7 4h2l3 8.5M5.5 8.5h5"/></symbol>
+  <symbol id="i-proj" viewBox="0 0 16 16"><rect x="1.5" y="3" width="13" height="8" rx="1"/><path d="M5 14h6M8 11v3"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 16 16"><path d="M2 3.5h12v7.5H6l-3 2.5V11H2z"/></symbol>
+  <symbol id="i-help" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5"/><path d="M6.2 6.2a1.9 1.9 0 1 1 2.6 1.8c-.6.3-.8.7-.8 1.3M8 11.3v.2"/></symbol>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 16 16"><path d="M3 8h10"/></symbol>
+  <symbol id="i-orbit" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.5"/><ellipse cx="8" cy="8" rx="6.5" ry="3" transform="rotate(-25 8 8)"/></symbol>
+  <symbol id="i-send" viewBox="0 0 16 16"><path d="M2 8h11M9 4l4 4-4 4"/></symbol>
+  <symbol id="i-close" viewBox="0 0 16 16"><path d="m4 4 8 8M12 4l-8 8"/></symbol>
+  <symbol id="i-bookmark" viewBox="0 0 16 16"><path d="M4 2h8v12l-4-3-4 3z"/></symbol>
+  <symbol id="i-download" viewBox="0 0 16 16"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M2.5 13.5h11"/></symbol>
+  <symbol id="i-link" viewBox="0 0 16 16"><path d="M6.5 9.5 9.5 6.5M7 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M9 11.5l-1 1A2.5 2.5 0 0 1 4.5 9l1-1"/></symbol>
+</svg>
+
+<header class="bar">
+  <div class="brand"><svg class="ico acc"><use href="#i-logo"/></svg><span>Ask the Satellite</span></div>
+  <nav class="nav">
+    <button class="tab active" aria-current="page" id="navWork">Workspace</button>
+    <button class="tab" id="navSaved" aria-expanded="false" aria-controls="drawer">Saved regions</button>
+  </nav>
+  <div class="tools">
+    <div class="pop-wrap">
+      <button class="tool" id="btnLayers" aria-expanded="false" aria-controls="layersPop"><svg class="ico"><use href="#i-layers"/></svg><span>Layers</span></button>
+      <div class="pop" id="layersPop" hidden>
+        <div class="eyebrow">Analysis layers</div>
+        <label><input type="checkbox" data-layer="before" checked> Before RGB</label>
+        <label><input type="checkbox" data-layer="after" checked> After RGB</label>
+        <label><input type="checkbox" data-layer="change" checked> Change <span class="key"><i class="g"></i>gain <i class="l"></i>loss</span></label>
+        <label><input type="checkbox" data-layer="mask"> Masked <span class="key"><i class="m"></i>not measured</span></label>
+        <label><input type="checkbox" data-layer="labels"> Labels</label>
+        <div class="eyebrow">Basemap · context only, not analysed</div>
+        <label><input type="radio" name="basemap" value="esri" checked> Esri World Imagery</label>
+        <label><input type="radio" name="basemap" value="naturalearth"> Natural Earth II (offline)</label>
+      </div>
+    </div>
+    <div class="seg" role="group" aria-label="Compare mode">
+      <button class="seg-b active" data-compare="ba" aria-pressed="true">Before | After</button>
+      <button class="seg-b" data-compare="bt" aria-pressed="false">Before | Today</button>
+    </div>
+    <button class="tool" id="btnVerify" disabled><svg class="ico"><use href="#i-check"/></svg><span>Verify the science</span></button>
+    <button class="tool" id="btnTilt" aria-pressed="false"><svg class="ico"><use href="#i-tilt"/></svg><span>Tilt</span></button>
+    <button class="tool" id="btnProj" aria-pressed="false" title="Projector mode (P)"><svg class="ico"><use href="#i-proj"/></svg><span>Projector</span></button>
+  </div>
+  <span class="pill" id="modePill" title="Where the numbers on screen come from">Pre-computed</span>
+  <button class="tool chat-toggle" id="btnChat" aria-pressed="true" aria-controls="chat" title="Assistant (C)"><svg class="ico"><use href="#i-chat"/></svg><span>Assistant</span></button>
+  <button class="tool icon-only" id="btnHelp" aria-label="Keyboard shortcuts and help"><svg class="ico"><use href="#i-help"/></svg></button>
+</header>
+
+<main class="app" id="app">
+  <section class="stage" id="stage" aria-label="Globe">
+    <div id="globe"></div>
+    <div class="chip search" role="search">
+      <svg class="ico"><use href="#i-search"/></svg>
+      <input id="search" type="search" placeholder="Search a place" autocomplete="off" aria-label="Search a place" dir="auto">
+    </div>
+    <div class="chip imagery-pill" id="imageryPill" hidden></div>
+    <div class="chip detail-chip" id="detailChip" hidden>Beyond native imagery detail</div>
+    <div class="swipe" id="swipe" hidden>
+      <div class="swipe-line"></div>
+      <button class="swipe-handle" id="swipeHandle" aria-label="Drag to compare before and after" role="slider" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"><svg viewBox="0 0 16 16" class="ico"><path d="M6 4 2 8l4 4M10 4l4 4-4 4"/></svg></button>
+      <div class="swipe-tag left" id="tagLeft"></div>
+      <div class="swipe-tag right" id="tagRight"></div>
+    </div>
+    <div class="hint" id="hint">Drag to rotate · Scroll to zoom</div>
+    <div class="chip hud" id="hud"><span id="hudCoord">—</span><span id="hudHeight">—</span><span class="scale"><i id="scaleBar"></i><span id="scaleText"></span></span></div>
+    <div class="nav-chips">
+      <button class="chip btn" id="zoomIn" aria-label="Zoom in"><svg class="ico"><use href="#i-plus"/></svg></button>
+      <button class="chip btn" id="zoomOut" aria-label="Zoom out"><svg class="ico"><use href="#i-minus"/></svg></button>
+      <button class="chip btn" id="compass" aria-label="Reset heading to north"><svg viewBox="0 0 16 16" class="ico" id="compassNeedle"><path d="M8 1.5 10 8H6z" fill="#F85149" stroke="none"/><path d="M8 14.5 6 8h4z" fill="#A6B0C3" stroke="none"/></svg></button>
+      <button class="chip btn wide" id="resetOrbit"><svg class="ico"><use href="#i-orbit"/></svg><span>Reset to orbit</span></button>
+    </div>
+    <div class="attrib" id="attrib"><span id="attribText"></span><span id="credits"></span></div>
+    <div class="fatal" id="fatal" hidden></div>
+    <aside class="drawer" id="drawer" hidden aria-label="Saved regions">
+      <div class="drawer-head"><span class="eyebrow">Saved regions</span><button class="x" id="drawerClose" aria-label="Close saved regions"><svg class="ico"><use href="#i-close"/></svg></button></div>
+      <div class="eyebrow sub">Stories · pre-computed from real scenes</div>
+      <div id="stories" class="stories"></div>
+      <div class="eyebrow sub">Your bookmarks · this browser only</div>
+      <div id="bookmarks" class="stories"></div>
+    </aside>
+  </section>
+
+  <aside class="chat" id="chat" aria-label="Satellite assistant">
+    <div class="chat-head">
+      <div class="chat-title">Satellite assistant</div>
+      <div class="pills"><span class="pill sm" id="pillData">Pre-computed</span><span class="pill sm" id="pillModel">Rules</span><span class="pill sm" id="pillNet">checking</span></div>
+    </div>
+    <div class="log" id="log" aria-live="polite">
+      <div class="empty" id="empty">
+        <div class="eyebrow">Evidence from Landsat and Sentinel-2</div>
+        <h2>What's changing here?</h2>
+        <p class="mut">Ask about a coast, lake, flood or forest. Every number comes from the change engine and carries its dates, sensors and a confidence badge.</p>
+        <div class="starters">
+          <button class="starter" data-q="Compare the Palm Jumeirah reclamation between 2000 and 2001 and show the images and also say what happened and what are the downsides and etc.">Compare the Palm Jumeirah reclamation between 2000 and 2001, show the images, what happened and the downsides</button>
+          <button class="starter" data-q="Did Lake Mead shrink?">Did Lake Mead shrink?</button>
+          <button class="starter" data-q="UAE flood April 2024">UAE flood April 2024</button>
+          <button class="starter" dir="auto" data-q="أظهر لي جزيرة نخلة جميرا قبل وبعد">أظهر لي جزيرة نخلة جميرا قبل وبعد</button>
+        </div>
+      </div>
+    </div>
+    <form class="composer" id="composer">
+      <div class="region-chip" id="regionChip" hidden></div>
+      <div class="compose-row">
+        <textarea id="q" rows="1" dir="auto" placeholder="Ask about a place and a time…" aria-label="Ask the satellite"></textarea>
+        <button class="send" id="send" aria-label="Send"><svg class="ico"><use href="#i-send"/></svg></button>
+      </div>
+      <div class="compose-meta"><span>Enter to send · Shift+Enter for a new line</span><span>/ to focus</span></div>
+    </form>
+  </aside>
+</main>
+
+<dialog id="verify" class="modal" aria-labelledby="verifyTitle"></dialog>
+<dialog id="lightbox" class="modal lightbox" aria-label="Image viewer"></dialog>
+<dialog id="help" class="modal" aria-labelledby="helpTitle">
+  <div class="modal-head"><h3 id="helpTitle">Shortcuts and help</h3><button class="x" data-close aria-label="Close"><svg class="ico"><use href="#i-close"/></svg></button></div>
+  <dl class="keys">
+    <dt>C</dt><dd>Show or hide the assistant</dd><dt>/</dt><dd>Focus the question box</dd><dt>S</dt><dd>Swipe on or off</dd>
+    <dt>P</dt><dd>Projector mode</dd><dt>1 2 3</dt><dd>Pitch scenes: Palm 2001 to 2008, UAE flood 2024, Lake Mead</dd><dt>Esc</dt><dd>Close a dialog</dd>
+  </dl>
+  <p class="mut">Measured layers come from Landsat (30 m) and Sentinel-2 (10 to 20 m) through the same change engine as live runs. The Esri basemap is current, mixed-date imagery shown for context only; it is never analysed.</p>
+</dialog>
+
+<script src="vendor/cesium/Cesium.js"></script>
+<script src="globe.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

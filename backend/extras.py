@@ -44,7 +44,7 @@ def compare(pid, y1, y2, index="mndwi"):
     rel = f"presets/{pid}__{y1}_{y2}" + ("" if index == "mndwi" else f"_{index}")
     out = CACHE / rel
     if (out / "result.json").exists():
-        return with_context(json.loads((out / "result.json").read_text()), pid)
+        return _radiometry(with_context(json.loads((out / "result.json").read_text()), pid), pid, y1, y2)
     A, B = load_frame(pid, y1), load_frame(pid, y2)
     if A["ds"]["red"].shape != B["ds"]["red"].shape or not (np.allclose(A["ds"].x, B["ds"].x) and np.allclose(A["ds"].y, B["ds"].y)):
         raise ValueError("cached frames are not on one grid")
@@ -54,7 +54,15 @@ def compare(pid, y1, y2, index="mndwi"):
              ranking=None, layers={k: f"/cache/{rel}/{k}.png" for k in ("rgb_before", "rgb_after", "change", "mask")},
              attribution=main._attr(A, B), error=None)
     (out / "result.json").write_text(json.dumps(a, default=str))
-    return with_context(a, pid)
+    return _radiometry(with_context(a, pid), pid, y1, y2)
+
+
+def _radiometry(a, pid, y1, y2):
+    """Additive scene fields for the Verify modal: the scale and offset actually applied to each frame."""
+    for key, y in (("scene_before", y1), ("scene_after", y2)):
+        m = json.loads((FRAMES / pid / y / "meta.json").read_text())
+        a[key] = {**a[key], "scale": m["scale"], "offset": m["offset"]}
+    return a
 
 
 @router.get("/api/compare")
