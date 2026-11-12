@@ -1,4 +1,4 @@
-// app.js - chat, evidence cards, Trust UI, drawer, modals and shortcuts. Talks to /api/* and drives window.Globe.
+// app.js - search, assistant (streamed answers), evidence report, Trust UI, stories, modals and shortcuts. Drives window.Globe.
 (() => {
   const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -7,53 +7,51 @@
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const fmtDate = iso => { const [y, m, d] = String(iso).slice(0, 10).split('-'); return `${+d} ${MONTHS[+m - 1]} ${y}`; };
   const SENSOR = { 'landsat-5': 'Landsat 5 TM', 'landsat-7': 'Landsat 7 ETM+', 'landsat-8': 'Landsat 8 OLI', 'landsat-9': 'Landsat 9 OLI-2',
-                   'sentinel-2a': 'Sentinel-2A MSI', 'sentinel-2b': 'Sentinel-2B MSI', 'sentinel-2c': 'Sentinel-2C MSI' };
+                   'sentinel-2a': 'Sentinel-2A', 'sentinel-2b': 'Sentinel-2B', 'sentinel-2c': 'Sentinel-2C' };
   const sensorName = p => SENSOR[String(p).toLowerCase()] || p;
-  const resText = s => s.sensor === 'sentinel-2' && s.resolution_m > 10 ? `${s.resolution_m} m grid (10 m native)` : `${s.resolution_m} m`;
+  const resText = s => s.sensor === 'sentinel-2' && s.resolution_m > 10 ? `${s.resolution_m} m grid` : `${s.resolution_m} m`;
   const caption = s => `${sensorName(s.platform)} · ${resText(s)} · ${fmtDate(s.day)}`;
   const INDEX = { mndwi: ['MNDWI', '(green − SWIR1) / (green + SWIR1)', 'water'], ndvi: ['NDVI', '(NIR − red) / (NIR + red)', 'vegetated'],
                   flood: ['MNDWI flood rule', 'before < 0, after > −0.05 and rise > 0.18', 'flooded'], nbr: ['dNBR', '(NIR − SWIR2) / (NIR + SWIR2), pre − post', 'burned'] };
   const STORY_MSG = { palm_jumeirah: 'Palm Jumeirah 2001 to 2008' };
   const icon = id => `<svg class="ico"><use href="#${id}"/></svg>`;
+  const app = $('#app'), log = $('#log');
 
-  let cfg = { online: false, attributions: {}, model: null }, last = null, lastQ = null, busy = false, presets = [];
-  const app = $('#app');
+  let cfg = { online: false, attributions: {}, model: null }, last = null, lastQ = null, current = null, presets = [];
 
   // ------------------------------------------------------------ boot
   async function boot() {
     try { cfg = await api('/api/config', { signal: AbortSignal.timeout(4000) }); } catch { cfg = { online: false, attributions: {}, model: null }; }
-    setNet(cfg.online && navigator.onLine);
-    $('#pillModel').textContent = cfg.model ? cfg.model.split(':')[0] : 'Rules';
-    $('#pillModel').title = cfg.model ? `Local model ${cfg.model} (plans and words; never computes numbers)` : 'No local model: rule router and templates';
+    renderStatus();
     Globe.on('fatal', fatal);
     Globe.on('imagery', imagery);
-    Globe.on('interacted', () => $('#hint').classList.add('gone'));
     Globe.on('compare', updateTags);
     const ok = await Globe.init(cfg);
+    $('#optSpin').checked = Globe.state.spin;
     loadStories();
     if (ok) setTimeout(() => $('#hint').classList.add('gone'), 9000);
   }
 
-  function setNet(online) {
-    const p = $('#pillNet');
-    p.textContent = online ? 'Online' : 'Offline';
-    p.className = 'pill sm ' + (online ? 'on' : 'off');
+  function renderStatus() {
+    const online = cfg.online && navigator.onLine;
+    const model = cfg.model ? `${cfg.model.split(':')[0]} · on this machine` : 'no language model · rules and templates';
+    $('#chatSub').innerHTML = `<span class="dot ${online ? 'on' : 'off'}"></span>${online ? 'Online' : 'Offline'} · ${esc(model)}`;
+    $('#modelNote').textContent = cfg.live === false ? 'Stories only on this host' : '';
   }
-  addEventListener('online', () => api('/api/config').then(c => { cfg = { ...cfg, ...c }; setNet(c.online); }).catch(() => {}));
-  addEventListener('offline', () => setNet(false));
+  addEventListener('online', () => api('/api/config').then(c => { cfg = { ...cfg, ...c }; renderStatus(); }).catch(() => {}));
+  addEventListener('offline', () => { cfg.online = false; renderStatus(); });
 
   function imagery(kind) {
-    const pill = $('#imageryPill');
-    const card = $('.esri-card');
+    const pill = $('#imageryPill'), card = $('.esri-card');
     if (card) card.remove();
-    if (kind === 'esri') { pill.hidden = true; }
+    if (kind === 'esri') pill.hidden = true;
     else if (kind === 'naturalearth') { pill.hidden = false; pill.textContent = 'Imagery: Natural Earth II · coarse, context only'; }
     else {
-      pill.hidden = false; pill.textContent = kind === 'offline' ? 'Imagery: Natural Earth II · offline' : 'Imagery: Natural Earth II · Esri unavailable';
+      pill.hidden = false; pill.textContent = kind === 'offline' ? 'Imagery: offline · NASA Blue Marble' : 'Imagery: Esri unavailable · NASA Blue Marble';
       if (kind === 'failed') {
         const d = document.createElement('div');
         d.className = 'esri-card';
-        d.innerHTML = '<b>Esri World Imagery is not loading.</b> The globe fell back to the bundled Natural Earth II texture. Measured layers and numbers are unaffected: they come from Landsat and Sentinel-2 scenes on disk.';
+        d.innerHTML = '<b>Esri World Imagery is not loading.</b> The globe fell back to NASA Blue Marble. Measured layers and numbers are unaffected: they come from Landsat and Sentinel-2 scenes on disk.';
         $('#stage').append(d);
         setTimeout(() => d.remove(), 12000);
       }
@@ -63,7 +61,8 @@
 
   function setAttribution() {
     const A = cfg.attributions || {}, parts = [];
-    parts.push(Globe.state.basemap === 'esri' && Globe.state.esri === 'ok' ? 'Basemap: context only, current mixed dates, not analysed' : `Basemap: ${A.naturalearth || 'Natural Earth II'}`);
+    parts.push(Globe.state.esri === 'ok' && Globe.state.basemap === 'esri' ? 'Basemap: context only, current mixed dates, not analysed' : 'Basemap: NASA Blue Marble / Natural Earth II');
+    parts.push('Orbit: NASA Blue Marble');
     if (last) {
       const sensors = [last.scene_before.sensor, last.scene_after.sensor];
       if (sensors.includes('landsat')) parts.push(A.landsat || 'Landsat data courtesy of the U.S. Geological Survey');
@@ -78,12 +77,12 @@
   // ------------------------------------------------------------ stories, bookmarks, fallback
   async function loadStories() {
     try { presets = await api('/api/presets'); } catch { presets = []; }
-    const frames = (cfg.frames || {});
+    const frames = cfg.frames || {};
     const ready = presets.filter(p => p.cached || (frames[p.id] || []).length);
     const html = ready.map(p => `<button class="story" data-id="${esc(p.id)}" data-title="${esc(p.title)}">
-        ${p.cached ? `<img src="${esc(p.thumb)}" alt="">` : '<span class="ph"></span>'}
-        <span><b>${esc(p.title)}</b><small>Pre-computed · ${p.tier === 'A' ? 'core story' : 'extra'}</small></span></button>`).join('');
-    $('#stories').innerHTML = html || '<p class="mut">No stories are cached yet. Run precompute.py with internet.</p>';
+        ${p.cached ? `<img src="${esc(p.thumb)}" alt="" loading="lazy">` : '<span class="ph"></span>'}
+        <span><b>${esc(p.title)}</b><small>Measured · ${p.tier === 'A' ? 'core story' : 'extra'}</small></span></button>`).join('');
+    $('#stories').innerHTML = html || '<p class="mut">No stories are cached yet.</p>';
     if (!$('#fatal').hidden) $('#fatal .stories').innerHTML = html;
     renderBookmarks();
   }
@@ -93,12 +92,12 @@
   function renderBookmarks() {
     const b = getBk();
     $('#bookmarks').innerHTML = b.length ? b.map((x, i) => `<button class="story" data-bk="${i}"><span class="ph"></span><span><b>${esc(x.title)}</b><small>${esc(x.when)}</small></span></button>`).join('')
-      : '<p class="mut" style="margin:0">Bookmark an answer to keep it here.</p>';
+      : '<p class="mut" style="margin:0;font-size:12.5px">Bookmark an answer to keep it here.</p>';
   }
   document.addEventListener('click', e => {
     const s = e.target.closest('.story');
     if (!s) return;
-    if (s.dataset.bk) { const b = getBk()[+s.dataset.bk]; if (b) ask(b.message, b.preset_id); }
+    if (s.dataset.bk) { const b = getBk()[+s.dataset.bk]; if (b) ask(b.message, b.preset_id, b.hint); }
     else ask(STORY_MSG[s.dataset.id] || s.dataset.title, s.dataset.id);
     openDrawer(false);
   });
@@ -107,24 +106,57 @@
     const f = $('#fatal');
     f.hidden = false;
     f.innerHTML = `<div class="eyebrow">Globe unavailable</div><h2>The 3D globe could not start on this device.</h2>
-      <p class="mut">${esc(err && err.message || 'WebGL is not available.')} The assistant still works: pick a story and the evidence cards, images and confidence badge appear in the chat.</p>
+      <p class="mut">${esc(err && err.message || 'WebGL is not available.')} The assistant still works: pick a story and the images, measurements and confidence level appear in the chat.</p>
       <div class="stories"></div>`;
     loadStories();
   }
 
-  // ------------------------------------------------------------ chat
-  const log = $('#log');
-  function addMsg(cls, html) {
-    const d = document.createElement('div');
-    d.className = 'msg ' + cls;
-    d.innerHTML = html;
-    log.append(d);
-    log.scrollTop = log.scrollHeight;
-    return d;
+  // ------------------------------------------------------------ search (Google-Earth style type-ahead)
+  const sInput = $('#search'), sList = $('#suggest'), sBox = $('#searchBox');
+  let sItems = [], sIdx = -1, sCtrl = null, sTimer = null;
+  const KIND_ICON = { story: 'i-story', country: 'i-globe', region: 'i-globe', town: 'i-town' };
+  function renderSuggest(items, q) {
+    sItems = items; sIdx = items.length ? 0 : -1;
+    sList.innerHTML = items.length ? items.map((s, i) => `<li role="option" id="sg${i}" aria-selected="${i === 0}" class="${s.kind === 'story' ? 'story' : ''}" data-i="${i}">
+        ${icon(KIND_ICON[s.kind] || 'i-pin')}<span><b dir="auto">${esc(s.name)}</b><small>${esc(s.sub || '')}</small></span><span class="k">${esc(s.kind === 'story' ? 'story' : s.kind || '')}</span></li>`).join('')
+      : `<li class="none">No match for “${esc(q)}”. Press Enter to ask the assistant.</li>`;
+    sList.hidden = false; sBox.setAttribute('aria-expanded', 'true');
+  }
+  function closeSuggest() { sList.hidden = true; sBox.setAttribute('aria-expanded', 'false'); }
+  sInput.addEventListener('input', () => {
+    const q = sInput.value.trim();
+    clearTimeout(sTimer);
+    if (q.length < 2) return closeSuggest();
+    sTimer = setTimeout(async () => {
+      if (sCtrl) sCtrl.abort();
+      sCtrl = new AbortController();
+      try { renderSuggest(await api('/api/search?q=' + encodeURIComponent(q), { signal: sCtrl.signal }), q); } catch (e) { if (e.name !== 'AbortError') renderSuggest([], q); }
+    }, 160);
+  });
+  sInput.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (!sItems.length) return;
+      e.preventDefault();
+      sIdx = (sIdx + (e.key === 'ArrowDown' ? 1 : -1) + sItems.length) % sItems.length;
+      $$('#suggest li[role=option]').forEach((li, i) => li.setAttribute('aria-selected', i === sIdx));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (sItems[sIdx] && !sList.hidden) choose(sItems[sIdx]);
+      else if (sInput.value.trim()) { ask(sInput.value.trim()); closeSuggest(); sInput.blur(); }
+    } else if (e.key === 'Escape') { closeSuggest(); sInput.blur(); }
+  });
+  sList.addEventListener('mousedown', e => { const li = e.target.closest('li[data-i]'); if (li) { e.preventDefault(); choose(sItems[+li.dataset.i]); } });
+  sInput.addEventListener('blur', () => setTimeout(closeSuggest, 120));
+  function choose(s) {
+    closeSuggest(); sInput.value = s.name; sInput.blur();
+    if (s.preset_id) return ask(s.name.replace(/ reclamation$/, '') + ' before and after', s.preset_id);
+    Globe.flyTo(s.bbox);
+    ask([s.name, s.sub].filter(Boolean).join(', '), null, { name: s.name, center: s.center, bbox: s.bbox });
   }
 
-  async function sse(url, body, onEvent) {
-    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  // ------------------------------------------------------------ assistant
+  async function sse(url, body, onEvent, signal) {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });
     if (!r.ok || !r.body) throw new Error(`HTTP ${r.status}`);
     const rd = r.body.getReader(), dec = new TextDecoder();
     let buf = '';
@@ -145,22 +177,55 @@
     }
   }
 
-  const STEPS = [['locate', 'Locating'], ['scenes', 'Picking scenes'], ['measure', 'Measuring change']];
+  function setBusy(b) {
+    const s = $('#send');
+    s.classList.toggle('stop', b);
+    s.setAttribute('aria-label', b ? 'Stop' : 'Send');
+    s.innerHTML = icon(b ? 'i-stop' : 'i-send');
+  }
 
-  async function ask(message, preset_id = null) {
-    if (busy || !message.trim()) return;
-    busy = true; $('#send').disabled = true;
-    await ready;                                                   // the globe must exist before the first flight
+  async function ask(message, preset_id = null, hint = null) {
+    if (!message || !message.trim()) return;
+    if (current) current.stop('Stopped: you asked something new');
+    await ready;
     $('#empty') && $('#empty').remove();
+    if (app.classList.contains('chat-closed')) toggleChat(true);
     Globe.stopRotate();
-    lastQ = { message, preset_id };
-    addMsg('user', `<div class="bubble" dir="auto">${esc(message)}</div>`);
-    const m = addMsg('bot', `<div class="ticker">${STEPS.map(([k, l]) => `<div class="step" data-step="${k}"><span class="dot"></span>${l}</div>`).join('')}</div><div class="body"></div>`);
-    const body = m.querySelector('.body'), t0 = performance.now();
-    let flight = null, flownKey = null, analysis = null, reveal = Promise.resolve();
-    const step = (k, state) => { const s = m.querySelector(`[data-step="${k}"]`); if (s) { s.classList.remove('active', 'done'); s.classList.add(state); } };
+    lastQ = { message, preset_id, hint };
+    const turn = document.createElement('div');
+    turn.className = 'turn';
+    turn.innerHTML = `<div class="q-line" dir="auto">${esc(message)}</div>
+      <div class="status"><span class="spinner"></span><span class="lbl">Reading the question</span><span class="t">0.0 s</span></div><div class="body"></div>`;
+    log.append(turn);
+    const pinTop = () => { log.scrollTop = turn.offsetTop - log.offsetTop - 8; };     // keep the new answer's top in view
+    pinTop();
+    const body = turn.querySelector('.body'), status = turn.querySelector('.status'), lbl = status.querySelector('.lbl'), tEl = status.querySelector('.t');
+    const ctrl = new AbortController(), t0 = performance.now();
+    const tick = setInterval(() => { tEl.textContent = ((performance.now() - t0) / 1000).toFixed(1) + ' s'; }, 100);
+    let flight = null, flownKey = hint ? hint.bbox.join() : null, analysis = null, place = null, sayBox = null, reveal = Promise.resolve();
+    const me = current = {
+      stop(why) { ctrl.abort(); finish(why || 'Stopped'); },
+    };
+    function finish(text, verify) {
+      clearInterval(tick);
+      status.classList.add('done');
+      status.innerHTML = `<span class="lbl">${esc(text)}</span>${verify ? ' · <button data-verify>Verify the science</button>' : ''}`;
+      if (current === me) { current = null; setBusy(false); }
+    }
+    const sayTarget = () => {
+      if (!sayBox) {
+        sayBox = document.createElement('div');
+        sayBox.className = 'sect read';
+        sayBox.innerHTML = `<h4>${analysis ? 'The story' : 'Guide'}</h4><p dir="auto"></p><div class="byline">${analysis ? 'Narrated' : 'Written'} by ${esc((cfg.model || 'local model').split(':')[0])} from ${analysis ? 'the measurement and the named sources below' : 'Wikipedia'} · names and numbers checked before display</div>`;
+        const anchor = body.querySelector('[data-say-anchor]');
+        anchor ? anchor.after(sayBox) : body.append(sayBox);
+      }
+      return sayBox.querySelector('p');
+    };
+    setBusy(true);
     try {
-      await sse('/api/chat/stream', { message, preset_id, last_analysis_id: last && last.analysis_id }, async (ev, d) => {
+      await sse('/api/chat/stream', { message, preset_id, last_analysis_id: last && last.analysis_id, place_hint: hint }, async (ev, d) => {
+        if (me !== current) return;
         if (ev === 'plan') {
           if (d.fly_to && d.fly_to.join() !== flownKey) {
             flownKey = d.fly_to.join();
@@ -170,35 +235,45 @@
           const region = pr ? pr.title : d.place || d.plan.place;
           if (region) { $('#regionChip').hidden = false; $('#regionChip').textContent = `Region · ${region}`; }
         } else if (ev === 'progress') {
-          step(d.step, d.state);
+          lbl.textContent = d.label;
+        } else if (ev === 'place') {
+          place = d;
+          if (Globe.state.analysis) Globe.hideAnalysis();
+          body.insertAdjacentHTML('beforeend', placeHtml(d));
+          pinTop();
         } else if (ev === 'analysis') {
           analysis = d;
-          STEPS.forEach(([k]) => step(k, 'done'));
+          lbl.textContent = 'Flying there';
           reveal = (async () => {
             if (flight) await Promise.race([flight.done, sleep(Math.max(0, flight.start + flight.duration * 700 - performance.now()))]);
+            if (me !== current) return;
             showAnalysis(d);
-            body.insertAdjacentHTML('afterbegin', stripHtml(d));
-            wireStrip(body, d);
+            body.insertAdjacentHTML('afterbegin', reportHeadHtml(d));
+            wireCompare(body.querySelector('.cmp'), d);
+            pinTop();
           })();
+          await reveal;
+        } else if (ev === 'say') {
+          await reveal;
+          const p = sayTarget();
+          p.insertAdjacentHTML('beforeend', `<span class="say">${esc(d.text)} </span>`);
         } else if (ev === 'cards') {
           await reveal;
-          body.insertAdjacentHTML('beforeend', d.kind === 'analysis' ? cardsHtml(d, analysis) : `<div class="card info ${d.kind === 'error' ? 'error' : ''}" dir="auto">${esc(d.measured)}</div>${notesHtml(d.notes)}${nextHtml(d.next)}`);
-          log.scrollTop = log.scrollHeight;
+          if (d.kind === 'analysis') body.insertAdjacentHTML('beforeend', reportRestHtml(d, analysis));
+          else if (d.kind === 'place') body.insertAdjacentHTML('beforeend', actionsHtml(d.next));
+          else body.insertAdjacentHTML('beforeend', `<div class="info ${d.kind === 'error' ? 'error' : ''}" dir="auto">${esc(d.measured)}</div>${notesHtml(d.notes)}${actionsHtml(d.next)}`);
         } else if (ev === 'done') {
           await reveal;
           const s = ((performance.now() - t0) / 1000).toFixed(1);
-          const tk = m.querySelector('.ticker');
-          tk.className = 'ticker collapsed';
-          tk.innerHTML = analysis ? `Done in ${s} s · <button data-verify>Verify</button>` : `Done in ${s} s`;
-          if (analysis) m.insertAdjacentHTML('beforeend', `<div class="msg-foot"><button data-bookmark>${icon('i-bookmark')}Bookmark</button><button data-verify>${icon('i-check')}Verify the science</button></div>`);
+          finish(`Answered in ${s} s`, !!analysis);
+          if (analysis || place) turn.insertAdjacentHTML('beforeend', `<div class="foot"><button data-bookmark>${icon('i-bookmark')}Bookmark</button>${analysis ? `<button data-verify>${icon('i-check')}Verify the science</button>` : ''}</div>`);
         }
-      });
+      }, ctrl.signal);
+      if (me === current) finish(`Answered in ${((performance.now() - t0) / 1000).toFixed(1)} s`, !!analysis);
     } catch (e) {
-      body.insertAdjacentHTML('beforeend', `<div class="card info error">The server did not answer (${esc(e.message)}). Pre-computed stories still work from disk: open Saved regions.</div>`);
-      m.querySelector('.ticker').remove();
-    } finally {
-      busy = false; $('#send').disabled = false;
-      log.scrollTop = log.scrollHeight;
+      if (e.name === 'AbortError') return;
+      body.insertAdjacentHTML('beforeend', `<div class="info error">The server did not answer (${esc(e.message)}). Stories still work from disk: open Stories.</div>`);
+      finish('Not answered');
     }
   }
 
@@ -207,95 +282,94 @@
     Globe.showAnalysis(a);
     $('#btnVerify').disabled = false;
     $$('[data-layer=mask]')[0].checked = a.quality.confidence !== 'HIGH';
-    const live = a.mode === 'live';
-    for (const p of [$('#modePill'), $('#pillData')]) { p.textContent = live ? 'Live' : 'Pre-computed'; p.className = 'pill ' + (p.id === 'pillData' ? 'sm ' : '') + (live ? 'live' : 'pre'); }
     updateTags();
     setAttribution();
   }
 
   function updateTags() {
     if (!last) return;
-    const b = last.scene_before, a = last.scene_after, today = Globe.state.compare === 'bt';
-    $('#tagLeft').textContent = `Before · ${caption(b)}`;
-    $('#tagRight').textContent = today ? (Globe.state.esri === 'ok' ? 'Right: Esri imagery, current, mixed dates. Visual only, not measured.' : 'Right: Natural Earth II basemap. Visual only, not measured.') : `After · ${caption(a)}`;
+    const today = Globe.state.compare === 'bt';
+    $('#tagLeft').textContent = `Before · ${caption(last.scene_before)}`;
+    $('#tagRight').textContent = today ? (Globe.state.esri === 'ok' ? 'Right: Esri imagery, current, mixed dates. Visual only, not measured.' : 'Right: basemap. Visual only, not measured.') : `After · ${caption(last.scene_after)}`;
   }
 
-  // ------------------------------------------------------------ evidence rendering
-  function stripHtml(a) {
-    const b = a.scene_before, f = a.scene_after;
-    const th = (kind, bg, title, cap) => `<button class="thumb" data-thumb="${kind}" title="Click: focus the swipe. Click again: open full size.">
-      <div class="img" style="background-image:${bg}"></div><div class="cap"><b>${title}</b>${esc(cap)}</div></button>`;
-    return `<div class="sect"><div class="eyebrow">Imagery · same 0–0.30 reflectance stretch on both dates</div><div class="strip">
-      ${th('before', `url('${a.layers.rgb_before}')`, 'Before', caption(b))}
-      ${th('after', `url('${a.layers.rgb_after}')`, 'After', caption(f))}
-      ${th('change', `url('${a.layers.change}'),url('${a.layers.rgb_after}')`, 'Change', `${a.stats.gain_label}${a.stats.loss_label ? ' / ' + a.stats.loss_label : ''}`)}
-    </div></div>`;
+  // ------------------------------------------------------------ rendering: place guide
+  function placeHtml(d) {
+    const w = d.wiki || {}, m = w.main || {};
+    const stops = (w.nearby || []).map(n => `<li><button class="stop" data-goto='${esc(JSON.stringify({ c: n.center, t: n.title }))}'>
+        ${n.thumb ? `<img src="${esc(n.thumb)}" alt="" loading="lazy">` : '<span class="ph"></span>'}
+        <span><b dir="auto">${esc(n.title)}</b><small>${esc(n.description || n.extract || '')}</small></span><span class="d">${n.dist_km} km</span></button></li>`).join('');
+    return `${m.thumb ? `<div class="banner" style="background-image:url('${esc(m.thumb)}')" role="img" aria-label="${esc(m.title)}"></div>` : ''}
+      <h3 class="place-title" dir="auto">${esc(m.title || d.name)}</h3>
+      <p class="place-desc">${esc(m.description || d.full || '')}</p>
+      ${m.extract ? `<p class="extract" dir="auto">${esc(m.extract)}</p>` : '<p class="extract">No encyclopedia entry found for this spot. The globe shows it in current Esri imagery.</p>'}
+      ${m.url ? `<a class="src-link" href="${esc(m.url)}" target="_blank" rel="noopener noreferrer">Wikipedia${icon('i-ext')}</a>` : ''}
+      <div data-say-anchor></div>
+      ${stops ? `<div class="sect"><h4>Worth a stop nearby</h4><ol class="stops">${stops}</ol></div>` : ''}
+      <div class="byline" style="margin-top:8px">Place notes: Wikipedia (CC BY-SA 4.0). Not measured by satellite.</div>`;
   }
 
-  function wireStrip(root, a) {
-    root.querySelectorAll('[data-thumb]').forEach(t => t.addEventListener('click', () => {
-      const kind = t.dataset.thumb;
-      if (t.classList.contains('focus')) return lightbox(a, kind);
-      root.querySelectorAll('.thumb').forEach(x => x.classList.toggle('focus', x === t));
-      if (last !== a) showAnalysis(a);
-      Globe.setCompare('ba'); setSeg('ba'); Globe.setSwipe(true);
-      Globe.setLayer('change', kind === 'change' || $$('[data-layer=change]')[0].checked);
-      Globe.flyTo(a.bounds);
-    }));
+  // ------------------------------------------------------------ rendering: change report
+  function reportHeadHtml(a) {
+    const st = a.stats, q = a.quality, b = a.scene_before, f = a.scene_after;
+    const sign = st.net_km2 > 0 ? '+' : st.net_km2 < 0 ? '−' : '';
+    const noun = INDEX[a.index] ? INDEX[a.index][2] : '';
+    return `<div class="cmp" style="--p:50%" title="Drag to compare. Double-click for full size.">
+        <img src="${esc(a.layers.rgb_after)}" alt="After: ${esc(caption(f))}"><img class="chg" src="${esc(a.layers.change)}" alt="">
+        <div class="b"><img src="${esc(a.layers.rgb_before)}" alt="Before: ${esc(caption(b))}"></div>
+        <div class="hand"></div><span class="tag l">${esc(fmtDate(b.day))}</span><span class="tag r">${esc(fmtDate(f.day))}</span>
+      </div>
+      <div class="cmp-tools"><label><input type="checkbox" data-chg checked> Change</label>
+        <span class="legend"><i class="g"></i>${esc(st.gain_label)}${st.loss_label ? `<i class="l"></i>${esc(st.loss_label)}` : ''}</span>
+        <button class="ml" data-lb="after" title="Open full size" aria-label="Open full size">${icon('i-download')}</button></div>
+      <div class="figure-row">${q.headline_hidden ? '<div class="figure hidden">Too much cloud to measure reliably</div>'
+        : `<div class="figure">${sign}${Math.abs(st.net_km2).toFixed(2)} km²</div><div class="figure-lbl">net ${noun} area</div>`}</div>
+      <div class="when">${esc(caption(b))} → ${esc(caption(f))}</div>
+      ${q.headline_hidden ? '' : `<dl class="stats"><div><dt>Gained</dt><dd>${st.gain_km2} km²</dd></div><div><dt>Lost</dt><dd>${st.loss_km2} km²</dd></div><div><dt>Clear on both</dt><dd>${st.valid_pct_both}%</dd></div></dl>`}
+      <div data-say-anchor></div>`;
   }
 
-  const srcChip = (title, url) => `<a class="src" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${icon('i-link')}${esc(title)}</a>`;
+  function wireCompare(el, a) {
+    if (!el) return;
+    const set = x => { const r = el.getBoundingClientRect(); el.style.setProperty('--p', Math.min(98, Math.max(2, (x - r.left) / r.width * 100)) + '%'); };
+    el.addEventListener('pointerdown', e => { el.setPointerCapture(e.pointerId); set(e.clientX); const mv = ev => set(ev.clientX); el.addEventListener('pointermove', mv); el.addEventListener('pointerup', () => el.removeEventListener('pointermove', mv), { once: true }); });
+    el.addEventListener('dblclick', () => lightbox(a, 'after'));
+    const root = el.parentElement;
+    root.querySelector('[data-chg]').addEventListener('change', e => { el.classList.toggle('nochg', !e.target.checked); Globe.setLayer('change', e.target.checked); $$('[data-layer=change]')[0].checked = e.target.checked; });
+    root.querySelector('[data-lb]').addEventListener('click', () => lightbox(a, 'after'));
+  }
+
   const notesHtml = notes => (notes || []).map(n => `<div class="note" dir="auto">${esc(n)}</div>`).join('');
-  const nextHtml = next => next && next.length ? `<div class="sect"><div class="eyebrow">Next</div><div class="next">${next.map(c =>
-      `<button data-next='${esc(JSON.stringify(c))}'>${esc(c.label)}</button>`).join('')}</div></div>` : '';
+  const actionsHtml = next => next && next.length ? `<div class="actions">${next.map(c => `<button class="act" data-next='${esc(JSON.stringify(c))}'>${esc(c.label)}${icon('i-arrow')}</button>`).join('')}</div>` : '';
 
-  function cardsHtml(c, a) {
+  function reportRestHtml(c, a) {
     const st = a.stats, q = a.quality, b = a.scene_before, f = a.scene_after, ctx = c.context;
     const [iname] = INDEX[a.index] || [a.index];
-    const sign = st.net_km2 > 0 ? '+' : st.net_km2 < 0 ? '−' : '';
-    const figure = q.headline_hidden ? '<div class="figure" style="font-size:15px">Too much cloud to measure reliably</div>'
-      : `<div class="figure">${sign}${Math.abs(st.net_km2).toFixed(2)} km²<small>net ${INDEX[a.index] ? INDEX[a.index][2] : ''} area</small></div>
-         <div class="meta">${esc(caption(b))} → ${esc(caption(f))}</div>`;
-    let h = `<div class="sect"><div class="eyebrow">What happened</div>
-      <div class="card measured" dir="auto"><div class="head"><span class="eyebrow">Measured by satellite · ${esc(iname)}</span></div>${figure}
-        <p style="margin:8px 0 0">${esc(c.measured)}</p></div>`;
-    if (ctx && ctx.what_happened && ctx.what_happened.length)
-      h += `<div class="card" dir="auto"><span class="eyebrow">Context · reported by named sources</span><ul class="lines">${ctx.what_happened.map(x =>
-        `<li><span>${esc(x.text)}</span>${srcChip(x.source_title, x.source_url)}</li>`).join('')}</ul></div>`;
-    h += notesHtml(c.notes) + '</div>';
-
-    const qc = c.quality || {}, whyB = whyText(b), whyA = whyText(f);
+    const srcs = [], cite = (title, url) => { let i = srcs.findIndex(s => s.url === url); if (i < 0) { srcs.push({ title, url }); i = srcs.length - 1; } return `<a class="cite" href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(title)}">[${i + 1}]</a>`; };
+    let h = `<p class="measured" dir="auto"><span class="eyebrow">Measured · ${esc(iname)}</span><br>${esc(c.measured)}</p>${notesHtml(c.notes)}`;
+    if (c.interpretation) h += `<div class="sect"><h4>What it might mean · AI hypothesis</h4><p class="ai" dir="auto">${esc(c.interpretation.text)}</p></div>`;
+    if (ctx) {
+      if ((ctx.what_happened || []).length) h += `<div class="sect"><h4>What happened · named sources</h4><ul class="ctx-list">${ctx.what_happened.map(x => `<li dir="auto">${esc(x.text)}${cite(x.source_title, x.source_url)}</li>`).join('')}</ul></div>`;
+      if ((ctx.downsides || []).length) h += `<div class="sect"><h4>Reported downsides · not measured by satellite</h4><ul class="ctx-list">${ctx.downsides.map(x => `<li dir="auto">${esc(x.text)}${cite(x.source_title, x.source_url)}${x.disputed ? `<span class="tag-d">Disputed by developer</span>${x.disputed_note ? `<span class="dispute">${esc(x.disputed_note.replace(/^Disputed by developer:\s*/i, ''))}</span>` : ''}` : ''}</li>`).join('')}</ul></div>`;
+      if ((ctx.counterpoints || []).length) h += `<div class="sect"><h4>Counterpoints · developer and scientist statements</h4><ul class="ctx-list">${ctx.counterpoints.map(x => `<li dir="auto">${esc(x.text)}${cite(x.source_title, x.source_url)}</li>`).join('')}</ul></div>`;
+    }
+    const qc = c.quality || {};
     const res = [...new Set([b, f].map(s => `${s.resolution_m} m (${s.sensor === 'landsat' ? 'Landsat' : 'Sentinel-2'})`))].join(' and ');
-    h += `<div class="sect"><div class="eyebrow">Data quality</div><div class="card q-${esc(q.confidence)}" dir="auto">
-      <div class="head"><span class="badge ${esc(q.confidence)}">Data confidence: ${esc(q.confidence)}</span>
-        <span class="meta"><span class="why" tabindex="0" title="${esc(whyB)}">Why this scene?</span> · <span class="why" tabindex="0" title="${esc(whyA)}">and this one?</span></span></div>
+    h += `<div class="sect"><h4>Evidence quality</h4><div class="quality" dir="auto">
+      <div class="row"><span class="badge ${esc(q.confidence)}">Data confidence: ${esc(q.confidence)}</span>
+        <span><span class="why" tabindex="0" title="${esc(whyText(b))}">Why this scene?</span> · <span class="why" tabindex="0" title="${esc(whyText(f))}">and this one?</span></span></div>
       <div class="vbar" title="Share of the area measurable on both dates"><i style="width:${Math.max(0, Math.min(100, st.valid_pct_both))}%"></i></div>
-      <div class="meta">${st.valid_pct_both}% measurable on both dates · before ${st.valid_pct_before}% · after ${st.valid_pct_after}%</div>
-      <div class="meta">${esc(caption(b))} → ${esc(caption(f))}</div>
-      <p style="margin:8px 0 0">${esc(qc.text || '')}</p>
+      <div class="when">${st.valid_pct_both}% clear on both dates · before ${st.valid_pct_before}% · after ${st.valid_pct_after}%<br>${esc(caption(b))} → ${esc(caption(f))}</div>
+      <p class="qtext">${esc(qc.text || '')}</p>
       <div class="chips">${(qc.flags || []).map(x => `<span class="qchip">${esc(x)}</span>`).join('')}
         ${st.ignored_small_km2 > 0 && !q.headline_hidden ? `<span class="qchip">Changes under ${st.min_mapping_unit_px} px ignored: ${st.ignored_small_km2} km²</span>` : ''}
-        <span class="qchip">Analysis ${esc(res)} · basemap high-res, not analysed</span></div>
-    </div></div>`;
-
-    if (ctx && ((ctx.downsides || []).length || (ctx.counterpoints || []).length)) {
-      h += `<div class="sect"><div class="eyebrow">From named sources, not measured by satellite</div><div class="card" dir="auto">
-        <span class="eyebrow">Reported downsides</span><ul class="lines">${(ctx.downsides || []).map(x => `<li><span>${esc(x.text)}</span>
-          ${x.disputed ? `<span class="tag" title="${esc(x.disputed_note || '')}">Disputed by developer</span>${x.disputed_note ? `<span class="meta">${esc(x.disputed_note.replace(/^Disputed by developer:\s*/i, ''))}</span>` : ''}` : ''}
-          ${srcChip(x.source_title, x.source_url)}</li>`).join('')}</ul>
-        ${(ctx.counterpoints || []).length ? `<div class="eyebrow" style="margin-top:12px">Counterpoints · developer and scientist statements</div><ul class="lines">${ctx.counterpoints.map(x =>
-          `<li><span>${esc(x.text)}</span>${srcChip(x.source_title, x.source_url)}</li>`).join('')}</ul>` : ''}
-      </div></div>`;
-    } else if (c.interpretation) {
-      h += `<div class="sect"><div class="eyebrow">What it might mean · AI hypothesis, not measured</div>
-        <div class="card ai" dir="auto"><p style="margin:0">${esc(c.interpretation.text)}</p>
-        <div class="meta" style="margin-top:6px">${c.interpretation.source === 'template' ? 'Fixed template (the number guard or the model was unavailable)' : 'Worded by ' + esc(c.interpretation.source.replace('llm:', '')) + '; every number checked against the measurements'}</div></div></div>`;
-    }
-    return h + nextHtml(c.next);
+        <span class="qchip">Analysis ${esc(res)} · basemap not analysed</span></div></div></div>`;
+    if (srcs.length) h += `<div class="sect"><h4>Sources</h4><ol class="sources">${srcs.map(s => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a></li>`).join('')}</ol></div>`;
+    return h + actionsHtml(c.next);
   }
 
   function whyText(s) {
-    return `Why ${fmtDate(s.day)}? Candidate days within the search window, with the real share of your area that was clear:\n` +
+    return `Why ${fmtDate(s.day)}? Candidate days in the search window, with the real share of your area that was clear:\n` +
       (s.candidates || []).map(c => `${fmtDate(c.day)}: ${c.valid_pct_aoi}% clear, tile cloud ${c.cloud_tile}%${c.day === s.day ? '  ← chosen' : ''}`).join('\n') +
       '\nThe clearest day wins; within 2 points the day nearer the target date wins.';
   }
@@ -308,13 +382,18 @@
       else ask(c.message, c.preset_id || null);
       return;
     }
+    const g = e.target.closest('[data-goto]');
+    if (g) { const { c, t } = JSON.parse(g.dataset.goto); Globe.flyTo([c[0] - 0.006, c[1] - 0.005, c[0] + 0.006, c[1] + 0.005]); Globe.pin(c, t); return; }
     if (e.target.closest('[data-verify]')) return openVerify();
-    if (e.target.closest('[data-bookmark]') && last && lastQ) {
+    const bm = e.target.closest('[data-bookmark]');
+    if (bm && lastQ) {
       const b = getBk().filter(x => x.message !== lastQ.message);
-      b.unshift({ ...lastQ, title: last.title || lastQ.message, when: `Saved ${fmtDate(new Date().toISOString())}` });
+      b.unshift({ ...lastQ, title: (last && last.title) || lastQ.message, when: `Saved ${fmtDate(new Date().toISOString())}` });
       setBk(b.slice(0, 20)); renderBookmarks();
-      e.target.closest('[data-bookmark]').innerHTML = `${icon('i-bookmark')}Saved`;
+      bm.innerHTML = `${icon('i-bookmark')}Saved`;
     }
+    const s = e.target.closest('.starter');
+    if (s) ask(s.dataset.q, s.dataset.preset || null);
   });
 
   // ------------------------------------------------------------ verify modal and lightbox
@@ -342,17 +421,21 @@
         <tr><th>Grid</th><td>EPSG:3857, ${a.scene_before.resolution_m} m, one grid for both dates; area corrected by cos²(latitude)</td></tr>
         <tr><th>Minimum mapping unit</th><td>${st.min_mapping_unit_px} pixels; ${st.ignored_small_km2} km² of smaller blobs ignored</td></tr>
         <tr><th>Valid pixels</th><td>before ${st.valid_pct_before}% · after ${st.valid_pct_after}% · both ${st.valid_pct_both}%</td></tr>
-        <tr><th>Confidence rules</th><td>HIGH ≥ 85% valid on both dates; MEDIUM 60–85% or one downgrade; LOW below 60% or two downgrades. One downgrade each for different sensor families and a season gap over 45 days. Under 50% valid the area headline is hidden. This is a data-quality badge, not a statistical interval.</td></tr>
+        <tr><th>Confidence rules</th><td>HIGH ≥ 85% valid on both dates; MEDIUM 60–85% or one downgrade; LOW below 60% or two downgrades. One downgrade each for different sensor families and a season gap over 45 days. Under 50% valid the area headline is hidden. A data-quality badge, not a statistical interval.</td></tr>
         <tr><th>Flags</th><td>${a.quality.flags.length ? a.quality.flags.map(esc).join(', ') : 'none'}</td></tr>
         <tr><th>Analysis id</th><td><code>${esc(a.analysis_id)}</code></td></tr></table>
+      <h4>Language model</h4><table><tr><th>Role</th><td>Plans the question and narrates. It never computes a number. Every narrated sentence is dropped unless all its numbers and proper names appear in the facts it was given.</td></tr>
+        <tr><th>Model</th><td>${esc(cfg.model || 'none on this host (rules and templates)')}</td></tr></table>
       <h4>Attribution</h4><table>
         <tr><th>Basemap (context only)</th><td>${esc(A.esri || '')}. Current, mixed-date imagery; never analysed.</td></tr>
+        <tr><th>Orbit view</th><td>${esc(A.nasa || 'NASA Blue Marble')}</td></tr>
         <tr><th>Landsat</th><td>${esc(A.landsat || '')}</td></tr>
         <tr><th>Sentinel-2</th><td>${esc(A.sentinel2 || '')}</td></tr>
         <tr><th>This analysis</th><td>${esc(a.attribution)}</td></tr>
         <tr><th>Globe</th><td>${esc(A.cesium || 'CesiumJS (Apache-2.0)')} · ${esc(A.naturalearth || '')}</td></tr>
-        <tr><th>Search</th><td>${esc(A.geocode || '')}</td></tr></table>
-      <p class="mut" style="margin-top:12px">No model training was performed. The language model plans the question and words the reply; it never computes or edits a number.</p></div>`;
+        <tr><th>Search and places</th><td>${esc(A.geocode || '')} · ${esc(A.wikipedia || '')}</td></tr>
+        <tr><th>Satellites</th><td>${esc(A.celestrak || '')}</td></tr></table>
+      <p class="mut" style="margin-top:12px;font-size:12.5px">No model training was performed.</p></div>`;
     $('#verify').showModal();
   }
 
@@ -360,17 +443,17 @@
     const url = kind === 'before' ? a.layers.rgb_before : kind === 'after' ? a.layers.rgb_after : a.layers.change;
     const s = kind === 'before' ? a.scene_before : a.scene_after;
     const lb = $('#lightbox');
-    lb.innerHTML = `<div class="modal-head"><h3>${kind === 'change' ? 'Change' : kind === 'before' ? 'Before' : 'After'} · ${esc(caption(s))}</h3>
-      <div class="lb-tools"><button data-zoom="1.4">${icon('i-plus')}</button><button data-zoom="0.7">${icon('i-minus')}</button>
-      <a href="${esc(url)}" download="${esc(a.analysis_id.replace(/[:]/g, '_'))}_${kind}.png">${icon('i-download')}Download PNG</a>
+    lb.innerHTML = `<div class="modal-head"><h3>${kind === 'before' ? 'Before' : 'After'} · ${esc(caption(s))}</h3>
+      <div class="lb-tools"><button data-k="before">Before</button><button data-k="after">After</button><button data-zoom="1.4">${icon('i-plus')}</button><button data-zoom="0.7">${icon('i-minus')}</button>
+      <a href="${esc(url)}" download="${esc(a.analysis_id.replace(/[:]/g, '_'))}_${kind}.png">${icon('i-download')}PNG</a>
       <button class="x" data-close aria-label="Close">${icon('i-close')}</button></div></div>
-      <div class="lb-view"><img alt="${esc(kind)} image" src="${esc(url)}" ${kind === 'change' ? `style="background:url('${esc(a.layers.rgb_after)}') 0 0/100% 100%"` : ''}></div>`;
-    lb.showModal();
+      <div class="lb-view"><img alt="${esc(kind)} image" src="${esc(url)}"></div>`;
+    lb.open || lb.showModal();
     const view = lb.querySelector('.lb-view'), img = lb.querySelector('img');
     let k = 1, x = 0, y = 0;
     const apply = () => { img.style.transform = `translate(${x}px,${y}px) scale(${k})`; };
     img.onload = () => { k = Math.min(view.clientWidth / img.naturalWidth, view.clientHeight / img.naturalHeight); x = (view.clientWidth - img.naturalWidth * k) / 2; y = (view.clientHeight - img.naturalHeight * k) / 2; apply(); };
-    const zoomAt = (f, cx, cy) => { x = cx - (cx - x) * f; y = cy - (cy - y) * f; k *= f; apply(); };
+    const zoomAt = (fct, cx, cy) => { x = cx - (cx - x) * fct; y = cy - (cy - y) * fct; k *= fct; apply(); };
     view.addEventListener('wheel', e => { e.preventDefault(); const r = view.getBoundingClientRect(); zoomAt(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX - r.left, e.clientY - r.top); }, { passive: false });
     view.addEventListener('pointerdown', e => {
       view.setPointerCapture(e.pointerId);
@@ -380,6 +463,7 @@
       view.addEventListener('pointerup', () => view.removeEventListener('pointermove', mv), { once: true });
     });
     lb.querySelectorAll('[data-zoom]').forEach(b => b.onclick = () => zoomAt(+b.dataset.zoom, view.clientWidth / 2, view.clientHeight / 2));
+    lb.querySelectorAll('[data-k]').forEach(b => b.onclick = () => lightbox(a, b.dataset.k));
   }
   document.addEventListener('click', e => { const c = e.target.closest('[data-close]'); if (c) c.closest('dialog').close(); });
 
@@ -392,57 +476,69 @@
   $('#btnLayers').onclick = e => { e.stopPropagation(); pop.hidden = !pop.hidden; $('#btnLayers').setAttribute('aria-expanded', !pop.hidden); };
   document.addEventListener('click', e => { if (!pop.hidden && !e.target.closest('.pop-wrap')) { pop.hidden = true; $('#btnLayers').setAttribute('aria-expanded', false); } });
   $('#btnVerify').onclick = openVerify;
-  $('#btnTilt').onclick = () => $('#btnTilt').setAttribute('aria-pressed', Globe.tilt());
-  Globe.on('tilt', v => $('#btnTilt').setAttribute('aria-pressed', v));
-  const projector = () => { const v = document.body.classList.toggle('projector'); $('#btnProj').setAttribute('aria-pressed', v); Globe.setProjector(v); };
-  $('#btnProj').onclick = projector;
-  const toggleChat = () => {
-    const closed = app.classList.toggle('chat-closed');
-    $('#btnChat').setAttribute('aria-pressed', !closed);
-    setTimeout(() => Globe.resize(), 260);
+  $('#btnTilt').onclick = () => $('#btnTilt').setAttribute('aria-pressed', !!Globe.tilt());
+  const projector = v => { const on = document.body.classList.toggle('projector', v); $('#optProj').checked = on; Globe.setProjector(on); };
+  $('#optProj').onchange = e => projector(e.target.checked);
+  $('#optSpin').onchange = e => Globe.setSpin(e.target.checked);
+  async function sats(want) {
+    const btn = $('#btnSats'), box = $('#optSats'), chip = $('#satChip');
+    chip.hidden = false; chip.textContent = want ? 'Loading satellites…' : '';
+    const onNow = await Globe.satellites(s => {
+      if (s.error) { chip.textContent = 'Satellites unavailable offline'; return; }
+      chip.textContent = `Live · ${s.count} satellites · CelesTrak`;
+    });
+    btn.setAttribute('aria-pressed', onNow); box.checked = onNow;
+    if (!onNow && !chip.textContent.startsWith('Satellites unavailable')) chip.hidden = true;
+  }
+  $('#btnSats').onclick = () => sats($('#btnSats').getAttribute('aria-pressed') !== 'true');
+  $('#optSats').onchange = e => { if ((e.target.checked) !== ($('#btnSats').getAttribute('aria-pressed') === 'true')) sats(e.target.checked); };
+  const toggleChat = force => {
+    const closed = force === true ? app.classList.remove('chat-closed') : app.classList.toggle('chat-closed');
+    $('#btnChat').setAttribute('aria-pressed', !app.classList.contains('chat-closed'));
+    setTimeout(() => Globe.resize(), 280);
+    return closed;
   };
-  $('#btnChat').onclick = toggleChat;
+  $('#btnChat').onclick = () => toggleChat();
+  $('#chatClose').onclick = () => toggleChat();
   app.addEventListener('transitionend', e => { if (e.target === app) Globe.resize(); });
-  addEventListener('resize', () => Globe.resize());
+  let rz;
+  addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => Globe.resize(), 120); });
+  if (matchMedia('(max-width: 900px)').matches) { app.classList.add('chat-closed'); $('#btnChat').setAttribute('aria-pressed', false); }
   $('#btnHelp').onclick = () => $('#help').showModal();
-  const openDrawer = v => { $('#drawer').hidden = !v; $('#navSaved').classList.toggle('active', v); $('#navWork').classList.toggle('active', !v); $('#navSaved').setAttribute('aria-expanded', v); };
+  const openDrawer = v => { $('#drawer').hidden = !v; $('#navSaved').setAttribute('aria-expanded', v); };
   $('#navSaved').onclick = () => openDrawer($('#drawer').hidden);
-  $('#navWork').onclick = () => openDrawer(false);
   $('#drawerClose').onclick = () => openDrawer(false);
   $('#zoomIn').onclick = () => Globe.zoom(1);
   $('#zoomOut').onclick = () => Globe.zoom(-1);
   $('#compass').onclick = () => Globe.northUp();
   $('#resetOrbit').onclick = () => { Globe.resetOrbit(); $('#btnTilt').setAttribute('aria-pressed', false); };
 
-  $('#search').addEventListener('keydown', async e => {
-    if (e.key !== 'Enter') return;
-    const inp = e.target, q = inp.value.trim();
-    if (!q) return;
-    inp.disabled = true;
-    try { const g = await api('/api/geocode?q=' + encodeURIComponent(q)); Globe.flyTo(g.bbox); inp.value = g.name; }
-    catch { inp.value = ''; inp.placeholder = `No match for "${q}"`; }
-    finally { inp.disabled = false; inp.blur(); }
-  });
-
   const q = $('#q');
   q.addEventListener('input', () => { q.style.height = 'auto'; q.style.height = Math.min(q.scrollHeight, 140) + 'px'; });
   q.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('#composer').requestSubmit(); } });
-  $('#composer').onsubmit = e => { e.preventDefault(); const v = q.value.trim(); if (v && !busy) { q.value = ''; q.style.height = 'auto'; ask(v); } };
-  log.addEventListener('click', e => { const s = e.target.closest('.starter'); if (s) ask(s.dataset.q); });
+  $('#composer').onsubmit = e => {
+    e.preventDefault();
+    if (current && !q.value.trim()) return current.stop('Stopped');
+    const v = q.value.trim();
+    if (v) { q.value = ''; q.style.height = 'auto'; ask(v); }
+  };
 
   const SCENES = { 1: ['Palm Jumeirah 2001 to 2008', 'palm_jumeirah'], 2: ['UAE flood, April 2024', 'dubai_flood_2024'], 3: ['Did Lake Mead shrink?', null] };
   document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); sInput.focus(); sInput.select(); return; }
     const typing = e.target.closest('input, textarea, [contenteditable]');
     if (e.key === 'Escape') { if (!pop.hidden) pop.hidden = true; if (!$('#drawer').hidden) openDrawer(false); return; }
     if (typing || e.ctrlKey || e.metaKey || e.altKey || document.querySelector('dialog[open]')) return;
     const k = e.key.toLowerCase();
     if (k === 'c') toggleChat();
-    else if (k === '/') { e.preventDefault(); if (app.classList.contains('chat-closed')) toggleChat(); q.focus(); }
+    else if (k === '/') { e.preventDefault(); toggleChat(true); q.focus(); }
     else if (k === 'p') projector();
     else if (k === 's') Globe.toggleSwipe();
+    else if (k === 't') $('#btnTilt').click();
+    else if (k === 'o') $('#resetOrbit').click();
     else if (SCENES[k]) ask(...SCENES[k]);
   });
 
-  window.App = { ask, get last() { return last; } };
+  window.App = { ask, get last() { return last; }, get busy() { return !!current; } };
   const ready = boot();
 })();

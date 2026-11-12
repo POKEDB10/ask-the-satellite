@@ -1,0 +1,70 @@
+{
+ "change|presets:palm_jumeirah__2000_2001|en": {
+  "sentences": [
+   "Between May 19, 2000, and May 22, 2001, the water area in the monitored location grew by 0.1 km², about the size of 7 football pitches.",
+   "The National reports that construction began in June 2001, and NASA Earth Observatory states that the Palm was built using dredged sand, starting in 2001.",
+   "This growth could mean the start of development, but reported downsides include environmental concerns such as coral reef destruction and beach erosion."
+  ],
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "at": "2026-11-12"
+ },
+ "change|presets:palm_jumeirah__2001_2008|en": {
+  "sentences": [
+   "Between 2001 and 2008, the water area of the Palm structure in Dubai shrank by 8.6 km², or 17%.",
+   "Construction began in June 2001, as reported by The National, and was completed by 2006, as described by NASA Earth Observatory.",
+   "This reduction could mean environmental downsides, such as beach erosion and potential loss of oxygen in the lagoon, as warned by UN University scientists."
+  ],
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "at": "2026-11-12"
+ },
+ "change|presets:palm_jumeirah__2001_2024|en": {
+  "sentences": [
+   "Between 2001 and 2024, the water area of the Palm structure in Dubai shrank by 9.2 km², or 18%.",
+   "According to The National, construction began in June 2001, and residential buildings started in 2006."
+  ],
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "at": "2026-11-12"
+ },
+ "change|presets:lake_mead|en": {
+  "sentences": [
+   "Between 2019-08-14 and 2022-09-07, the water area of the reservoir shrank by 47.6 km², or about 15%."
+  ],
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "at": "2026-11-12"
+ },
+ "change|presets:dubai_flood_2024|en": {
+  "sentences": [
+   "Between 2024-04-12 and 2024-04-22, the flooded area grew by 6.6 km² (+106%), about 921 football pitches.",
+   "According to The National Center of Meteorology, the UAE experienced its heaviest rainfall since 1949 on 16 April 2024, with 254.8 mm of rain in under 24 hours at Khatm Al Shakla.",
+   "This heavy rainfall could be the cause of the increased flooded area, but reported downsides include potential flooding impacts and infrastructure damage."
+  ],
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "at": "2026-11-12"
+ },
+ "change|presets:palm_jebel_ali|en": {
+  "sentences": [
+   "Between 2001 and 2008, the water area in the measured location shrank by 18.4 km².",
+   "According to USGS, this change occurred as the area was built up in the early 2000s and construction was suspended in 2009, which could mean the reported downsides include environmental impacts from the development."
+  ],
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "at": "2026-11-12"
+ },
+ "change|presets:palm_jumeirah__2001_2008|ar": {
+  "sentences": [
+   "بين 2001-05-22 و2008-05-17، انكمشت مساحة المياه بمقدار 8.6 كم² (-17%)، أي نحو 1,203 ملعب كرة قدم، حسبما يظهر في الصور الفضائية.",
+   "وفقًا لصحيفة \"الوطن\"، بدأ بناء جزيرة الفhma في يونيو 2001.",
+   "يمكن أن يعني هذا الانكماش تدهور البيئة البحرية، بما في ذلك تلوث المياه وإزالة المراعي البحرية، كما تقارر تقارير من \"مونغاباي\"."
+  ],
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "at": "2026-11-12"
+ },
+ "place|kyoto|en": {
+  "sentences": [
+   "Kyoto is a city in the Kansai region of Japan, known for its rich cultural heritage and historical significance.",
+   "It is famous for its many temples and shrines, including the historic Honnō-ji temple.",
+   "Nearby, Nishiki Market offers a vibrant experience with its traditional foods and goods, while the Kyoto International Manga Museum is a unique destination for manga enthusiasts."
+  ],
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "at": "2026-11-13"
+ }
+}
