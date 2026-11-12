@@ -1,0 +1,34 @@
+{
+ "year": "2001",
+ "sensor": "landsat",
+ "scale": 2.75e-05,
+ "offset": -0.2,
+ "day": "2001-05-22",
+ "platform": "landsat-7",
+ "scene_ids": [
+  "LE07_L2SP_160043_20010522_02_T1"
+ ],
+ "datetime": "2001-05-22T06:36:24.816294+00:00",
+ "source": "pc",
+ "res": 30,
+ "bounds": [
+  55.094934016448015,
+  25.08493022803313,
+  55.1752434028483,
+  25.150081146167402
+ ],
+ "target": "2001-05-16",
+ "candidates": [
+  {
+   "day": "2001-05-22",
+   "cloud_tile": 0.0,
+   "valid_pct_aoi": 100.0
+  },
+  {
+   "day": "2001-04-20",
+   "cloud_tile": 1.0,
+   "valid_pct_aoi": 95.7
+  }
+ ],
+ "valid_pct_frame": 100.0
+}
