@@ -23,7 +23,7 @@
         infoBox: false, sceneModePicker: false, selectionIndicator: false, timeline: false, navigationHelpButton: false,
         navigationInstructionsInitiallyVisible: false, scene3DOnly: true, baseLayer: false,
         terrainProvider: new C.EllipsoidTerrainProvider(), creditContainer: $('credits'),
-        requestRenderMode: true, maximumRenderTimeChange: Infinity, useBrowserRecommendedResolution: false, msaaSamples: 4,
+        requestRenderMode: true, maximumRenderTimeChange: Infinity, showRenderLoopErrors: false, useBrowserRecommendedResolution: false, msaaSamples: 4,
         // ?shots keeps the drawing buffer so headless screenshots can capture the canvas; off for the demo (faster)
         contextOptions: { webgl: { preserveDrawingBuffer: /[?&]shots\b/.test(location.search) } },
       });
@@ -40,7 +40,9 @@
     camera.percentageChanged = 0.002;
     camera.setView({ destination: C.Cartesian3.fromDegrees(ORBIT.lon, ORBIT.lat, ORBIT.h) });
 
-    scene.canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); emit('fatal', new Error('The graphics context was lost.')); });
+    const lost = err => { viewer.useDefaultRenderLoop = false; emit('fatal', err); };      // stop rendering into a dead context
+    scene.canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); lost(new Error('The graphics context was lost.')); });
+    scene.renderError.addEventListener((_, err) => lost(err instanceof Error ? err : new Error('Rendering stopped.')));
     // offline floor: bundled Natural Earth II
     base.ne = C.ImageryLayer.fromProviderAsync(C.TileMapServiceImageryProvider.fromUrl(C.buildModuleUrl('Assets/Textures/NaturalEarthII')));
     viewer.imageryLayers.add(base.ne);
@@ -93,6 +95,7 @@
   }
 
   function flyTo(bbox) {
+    if (!camera) return { duration: 0, done: Promise.resolve(false) };     // no WebGL: the chat still works
     stopRotate();
     const h = camera.positionCartographic.height;
     const fromOrbit = h > 2e6;
@@ -152,6 +155,7 @@
   const ALPHA = () => ({ before: 1, after: 1, change: st.projector ? 0.92 : 0.9, mask: 1 });
 
   function showAnalysis(a) {
+    if (!viewer) { st.analysis = a; return; }
     clearOverlays();
     st.analysis = a;
     const [w, s, e, n] = a.bounds, rectangle = C.Rectangle.fromDegrees(w, s, e, n);
@@ -299,8 +303,9 @@
     window.addEventListener('pointerup', () => { dragging = false; });
   }
 
+  const live = f => (...a) => (camera ? f(...a) : undefined);
   window.Globe = {
-    init, flyTo, resetOrbit, tilt, northUp, zoom, showAnalysis, stopRotate, stats,
+    init, flyTo, showAnalysis, stopRotate, stats, resetOrbit: live(resetOrbit), tilt: live(tilt), northUp: live(northUp), zoom: live(zoom),
     on: (n, f) => { (on[n] = on[n] || []).push(f); },
     setLayer(name, v) { st.want[name] = v; applyCompare(); },
     setCompare(mode) { st.compare = mode; applyCompare(); },

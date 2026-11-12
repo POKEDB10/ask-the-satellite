@@ -1,6 +1,6 @@
 """extras.py - additive routes for the globe UI: /api/compare, /api/chat/stream (SSE), /api/config.
 Numbers still come only from change.run_change; this module only loads cached frames and orchestrates."""
-import datetime as dt, json, math, os, pathlib, re, time
+import datetime as dt, json, math, os, pathlib, re, threading, time
 import numpy as np, xarray as xr
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -8,6 +8,18 @@ import agent, change, geocode, presets
 import main                                   # imported while main is still loading: attributes are read at call time
 
 router = APIRouter()
+
+
+def _warm():
+    """Load the primary model into VRAM once at server start (research §3.1). A cold 7B load takes longer than the
+    6 s chat timeout, which otherwise makes every request fall back to the small model and evict the big one."""
+    try:
+        agent._chat(agent.MODELS[0], "Reply with OK.", "OK", max_tokens=2, timeout=180)
+    except Exception:
+        pass                                                     # Ollama down: the rule router and templates still answer
+
+
+threading.Thread(target=_warm, daemon=True).start()
 ROOT = pathlib.Path(__file__).parent
 CACHE = ROOT / "cache"
 FRAMES = CACHE / "frames"
@@ -168,6 +180,10 @@ def _stream(req):
     if not (rp.preset_id or rp.intent == "explain_last"):
         yield _ev("progress", dict(step="locate", state="active", label="Reading the question"))
         p = agent.plan(q, has_last=bool(last))
+        if p.preset_id and p.preset_id != presets.match(p.place or ""):     # the LLM tied a nearby preset to another place
+            p.preset_id = None                                             # (e.g. Dubai Marina -> Palm): measure the named place
+        if p.intent == "explain_last":                                     # the rule router already caught real "why grey?" questions;
+            p.intent = "analyze"                                           # the 7B over-uses explain_last (bake-off), so never trust it alone
         pr = presets.PRESETS.get(p.preset_id)
         yield _ev("plan", dict(plan=p.model_dump(), fly_to=pr["bbox"] if pr else None, source=p.source))
     lang = req.lang if req.lang in ("en", "ar", "hi") else p.language

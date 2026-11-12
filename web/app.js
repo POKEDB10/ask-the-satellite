@@ -21,7 +21,7 @@
 
   // ------------------------------------------------------------ boot
   async function boot() {
-    try { cfg = await api('/api/config'); } catch { cfg = { online: false, attributions: {}, model: null }; }
+    try { cfg = await api('/api/config', { signal: AbortSignal.timeout(4000) }); } catch { cfg = { online: false, attributions: {}, model: null }; }
     setNet(cfg.online && navigator.onLine);
     $('#pillModel').textContent = cfg.model ? cfg.model.split(':')[0] : 'Rules';
     $('#pillModel').title = cfg.model ? `Local model ${cfg.model} (plans and words; never computes numbers)` : 'No local model: rule router and templates';
@@ -150,6 +150,7 @@
   async function ask(message, preset_id = null) {
     if (busy || !message.trim()) return;
     busy = true; $('#send').disabled = true;
+    await ready;                                                   // the globe must exist before the first flight
     $('#empty') && $('#empty').remove();
     Globe.stopRotate();
     lastQ = { message, preset_id };
@@ -443,5 +444,5 @@
   });
 
   window.App = { ask, get last() { return last; } };
-  boot();
+  const ready = boot();
 })();
