@@ -1,0 +1,55 @@
+{
+ "year": "2018",
+ "sensor": "sentinel-2",
+ "scale": 0.0001,
+ "offset": 0.0,
+ "day": "2018-01-14",
+ "platform": "sentinel-2b",
+ "scene_ids": [
+  "S2B_40RCN_20180114_0_L2A",
+  "S2B_40RBN_20180114_0_L2A"
+ ],
+ "datetime": "2018-01-14T06:58:39.671000+00:00",
+ "source": "earthsearch",
+ "res": 30,
+ "bounds": [
+  55.094934016448015,
+  25.08493022803313,
+  55.1752434028483,
+  25.150081146167402
+ ],
+ "target": "2018-01-15",
+ "candidates": [
+  {
+   "day": "2018-01-14",
+   "cloud_tile": 2.2,
+   "valid_pct_aoi": 90.4
+  },
+  {
+   "day": "2018-01-19",
+   "cloud_tile": 3.3,
+   "valid_pct_aoi": 85.7
+  },
+  {
+   "day": "2017-12-30",
+   "cloud_tile": 1.5,
+   "valid_pct_aoi": 85.1
+  },
+  {
+   "day": "2018-01-24",
+   "cloud_tile": 4.0,
+   "valid_pct_aoi": 77.0
+  },
+  {
+   "day": "2018-01-09",
+   "cloud_tile": 6.5,
+   "valid_pct_aoi": 83.5
+  },
+  {
+   "day": "2017-12-20",
+   "cloud_tile": 0.2,
+   "valid_pct_aoi": 86.6
+  }
+ ],
+ "valid_pct_frame": 90.0
+}

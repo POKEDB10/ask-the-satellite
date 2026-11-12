@@ -1,0 +1,35 @@
+{
+  "_note": "Curated, attributive context shown beside measured results. Never a source of numbers for the change engine. Each item was checked against its source on 12 Nov 2026; see reports/P4.md.",
+  "palm_jumeirah": {
+    "context": {
+      "what_happened": [
+        {"text": "Construction began in June 2001, according to The National.", "source_title": "The National, 16 Jun 2023", "source_url": "https://www.thenationalnews.com/weekend/2023/06/16/timeframe-when-construction-on-palm-jumeirah-began-22-years-ago/"},
+        {"text": "NASA Earth Observatory describes the Palm as begun in 2001 and completed in 2006, built from dredged sand.", "source_title": "NASA Earth Observatory", "source_url": "https://science.nasa.gov/earth/earth-observatory/artificial-archipelagos-dubai-united-arab-emirates-42477/"},
+        {"text": "The National reports that residential buildings began in 2006, with residents arriving a year later.", "source_title": "The National, 16 Jun 2023", "source_url": "https://www.thenationalnews.com/weekend/2023/06/16/timeframe-when-construction-on-palm-jumeirah-began-22-years-ago/"}
+      ],
+      "downsides": [
+        {"text": "Environmentalists said dredging silt muddied the water and destroyed the only known coral reef off Dubai.", "source_title": "Al Jazeera, 27 Oct 2005", "source_url": "https://www.aljazeera.com/news/2005/10/27/ecologists-slam-dubai-luxury-islands", "disputed": true, "disputed_note": "Disputed by developer: Nakheel said most of the coral was already dead."},
+        {"text": "Divers were reported as saying reefs, oyster beds and seagrass were being buried and choked by sediment.", "source_title": "Mongabay, 23 Aug 2005", "source_url": "https://news.mongabay.com/2005/08/dubais-artificial-islands-have-high-environmental-cost/", "disputed": true, "disputed_note": "Disputed by developer: a Nakheel scientist's rebuttal on the same page says the new reef is thriving."},
+        {"text": "Beaches were reported to be eroding as natural currents were disrupted.", "source_title": "Mongabay, 23 Aug 2005", "source_url": "https://news.mongabay.com/2005/08/dubais-artificial-islands-have-high-environmental-cost/", "disputed": false},
+        {"text": "UN University scientists warned that reduced wave action in the lagoon can promote algal blooms, and that sites where organic matter settles can lose oxygen and cause fish kills.", "source_title": "The National, 18 Feb 2009", "source_url": "https://www.thenationalnews.com/uae/marine-life-returns-to-the-palm-1.558161", "disputed": false},
+        {"text": "Lagoon currents, water budget and residence time have been studied in peer-reviewed work.", "source_title": "Cavalcante et al. 2011, J. Coastal Research", "source_url": "https://doi.org/10.2112/JCOASTRES-D-09-00177.1", "disputed": false},
+        {"text": "Water quality and surface temperature around the island over 2001 to 2020 were assessed with satellite data.", "source_title": "Mansourmoghaddam et al. 2022, Water 14(4):634", "source_url": "https://doi.org/10.3390/w14040634", "disputed": false}
+      ],
+      "counterpoints": [
+        {"text": "Developer statement: a Nakheel environmental scientist wrote that the Palm's crescent represents about 40 hectares of rocky reef.", "source_title": "Mongabay, 23 Aug 2005", "source_url": "https://news.mongabay.com/2005/08/dubais-artificial-islands-have-high-environmental-cost/"},
+        {"text": "Scientist statement: UN University scientists, in a study commissioned by Nakheel, said a new complex marine ecosystem was forming, although the waters \"will never again be what they once were\".", "source_title": "The National, 18 Feb 2009", "source_url": "https://www.thenationalnews.com/uae/marine-life-returns-to-the-palm-1.558161"}
+      ],
+      "milestones": [
+        {"year": 2001, "month": 6, "text": "Construction began June 2001 (The National)"},
+        {"year": 2006, "month": 1, "text": "NASA Earth Observatory: completed in 2006"}
+      ]
+    },
+    "next": [
+      {"label": "2001 to 2008", "message": "Palm Jumeirah 2001 to 2008", "preset_id": "palm_jumeirah", "years": ["2001", "2008"]},
+      {"label": "2000 to 2001", "message": "Palm Jumeirah 2000 to 2001", "preset_id": "palm_jumeirah", "years": ["2000", "2001"]},
+      {"label": "2001 to 2024", "message": "Palm Jumeirah 2001 to 2024", "preset_id": "palm_jumeirah", "years": ["2001", "2024"]},
+      {"label": "Before | Today", "action": "before_today"},
+      {"label": "Palm Jebel Ali", "message": "Show Palm Jebel Ali", "preset_id": "palm_jebel_ali"}
+    ]
+  }
+}

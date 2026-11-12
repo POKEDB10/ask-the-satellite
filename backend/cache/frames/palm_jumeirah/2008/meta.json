@@ -1,0 +1,34 @@
+{
+ "year": "2008",
+ "sensor": "landsat",
+ "scale": 2.75e-05,
+ "offset": -0.2,
+ "day": "2008-05-17",
+ "platform": "landsat-5",
+ "scene_ids": [
+  "LT05_L2SP_160043_20080517_02_T1"
+ ],
+ "datetime": "2008-05-17T06:35:02.867088+00:00",
+ "source": "pc",
+ "res": 30,
+ "bounds": [
+  55.094934016448015,
+  25.08493022803313,
+  55.1752434028483,
+  25.150081146167402
+ ],
+ "target": "2008-05-16",
+ "candidates": [
+  {
+   "day": "2008-05-17",
+   "cloud_tile": 0.0,
+   "valid_pct_aoi": 100.0
+  },
+  {
+   "day": "2008-04-15",
+   "cloud_tile": 19.0,
+   "valid_pct_aoi": 0.0
+  }
+ ],
+ "valid_pct_frame": 100.0
+}

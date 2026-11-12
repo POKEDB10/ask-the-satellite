@@ -130,7 +130,7 @@ def get_preset(pid: str):
     if pid not in presets.PRESETS:
         raise HTTPException(404, "unknown preset")
     try:
-        return run_preset(pid)
+        return extras.with_context(run_preset(pid), pid)          # additive: curated context field
     except Exception as e:
         raise HTTPException(503, f"preset not cached and live run failed: {e}")
 
@@ -199,6 +199,8 @@ def chat(req: ChatReq):
             "actions": [{"type": "fly_to", "bbox": a["bounds"]}, {"type": "show_analysis", "analysis_id": a["analysis_id"]}]}
 
 
+import extras                                                      # additive: globe UI routes (compare, chat stream, config)
+app.include_router(extras.router)
 app.mount("/cache", StaticFiles(directory=CACHE), name="cache")
 if (ROOT.parent / "web").exists():
     app.mount("/", StaticFiles(directory=ROOT.parent / "web", html=True), name="web")
