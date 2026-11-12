@@ -3,10 +3,10 @@
 Feel: quiet Google-Earth chrome plus Linear-style restraint. The globe is the hero; the chrome is thin, dense and precise.
 
 ## Colour (CSS variables in style.css)
-- Surfaces: `--bg #0B0F19` (page), `--bg-1 #111726` (chat pane), `--bg-2 #172033` (raised rows, inputs), `--glass rgba(11,15,25,.78)` (top bar and globe chips only).
+- Surfaces: `--bg #0B0F19` (page), `--bg-1 #101924` (chat pane, sampled from v1), `--bg-2 #172033` (raised rows, inputs), `--glass rgba(11,15,25,.78)` (top bar and globe chips only).
 - Lines: `--line #222B3D`, `--line-2 #2F3A52` (hover, focus edge). Borders instead of shadows.
 - Text: `--fg #E6EAF2` (15.6:1 on bg), `--fg-2 #A6B0C3` (8.4:1), `--fg-3 #7D879B` (4.9:1, minimum for any text).
-- One accent: `--acc #2DD4BF` (teal), `--acc-ink #06201C` for text on the accent.
+- One accent: `--acc #06B6D4` (v1 teal, sampled from reference/v1), `--acc-ink #03222A` for text on the accent. Page bg `#0B0F19` also sampled from v1.
 - Trust: `--hi #3FB950`, `--med #D29922`, `--lo #F85149`. Change pixels: gain `#1E90FF`, loss `#FF8C00` (they match `change.py`). Mask: grey stripes.
 - No gradients on text or surfaces. Glow only on the globe atmosphere (Cesium's).
 
