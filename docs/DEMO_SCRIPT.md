@@ -1,6 +1,6 @@
 # Demo script: Ask the Satellite (under 3 minutes)
 
-**Bold** = what you do. Quotes = what you say, about 330 words in total. At a calm pace that's about 2 minutes 20 seconds of talking, plus roughly 30 seconds of the globe flying.
+**Bold** = what you do. Quotes = what you say, about 250 words in total. At a calm pace that's under 2 minutes of talking, plus about 30–40 seconds of the globe flying: roughly 2:30 overall.
 
 **Before you start:** open the site and hard-refresh (Ctrl+Shift+R). Make sure the chat panel is open, then click **Orbit**. If typing fails, use backup keys **1** Palm, **2** UAE flood, **3** Lake Mead, **4** LA fire (click outside the chat box first).
 
