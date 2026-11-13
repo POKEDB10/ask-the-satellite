@@ -2,7 +2,7 @@
 
 Read the quotes out loud, like you're talking to a friend. *Italic lines* are what you do on screen. Every prompt below was tested and opens the right story.
 
-**To stay under 3 minutes:** say each lead-in line *while* you type the prompt, and keep talking while the globe flies. Don't wait in silence. Spoken, it's about 340 words, roughly 2½ minutes.
+**Hands-free typing:** press **Alt+1** to **Alt+4** and the app types each question for you like a person would (about 4 seconds), then sends it. Say the lead-in line while it types. **Esc** stops it if you press the wrong one. Keep talking while the globe flies; don't wait in silence. Spoken, it's about 340 words, roughly 2½ minutes.
 
 **Before you start:** open the site and hard-refresh (Ctrl+Shift+R). The chat should be open on the right. Click **Orbit** so the whole Earth is showing.
 
@@ -20,7 +20,7 @@ Read the quotes out loud, like you're talking to a friend. *Italic lines* are wh
 
 > "Let's start in Dubai. I'll ask about the land reclamation of Palm Jumeirah, from 2001 to 2008."
 
-*Type:* `Show me the land reclamation of Palm Jumeirah from 2001 to 2008` *and press Enter.*
+*Press **Alt+1**. It types* `Show me the land reclamation of Palm Jumeirah from 2001 to 2008` *and sends it by itself.*
 
 > "Watch the globe: it zooms out, turns, and flies straight to Dubai."
 
@@ -43,7 +43,7 @@ Read the quotes out loud, like you're talking to a friend. *Italic lines* are wh
 
 > "That was people *adding* land. Now let's look at nature *taking water away*. Lake Mead, in the US, went through a big drought."
 
-*Type:* `How much did Lake Mead shrink during the drought?` *and press Enter.*
+*Press **Alt+2**. It types* `How much did Lake Mead shrink during the drought?` *and sends it.*
 
 > "Between 2019 and 2022 the lake lost **47.6 square kilometres** of water, about 15 percent.
 > And we checked it: our numbers are within about **2 percent** of published scientific figures."
@@ -58,7 +58,7 @@ Read the quotes out loud, like you're talking to a friend. *Italic lines* are wh
 
 > "Drought is slow. Floods happen overnight. Let's go to the flood here in the UAE in April 2024."
 
-*Type:* `Show me the UAE flood in April 2024` *and press Enter.*
+*Press **Alt+3**. It types* `Show me the UAE flood in April 2024` *and sends it.*
 
 > "On the 16th of April the UAE had its heaviest rain in recorded history.
 > The app found **6.6 square kilometres** of newly flooded land."
@@ -73,7 +73,7 @@ Read the quotes out loud, like you're talking to a friend. *Italic lines* are wh
 
 > "And finally, fire. In January 2025, huge wildfires hit Los Angeles. Let's see how much land burned."
 
-*Type:* `How much land burned in the Los Angeles wildfire in 2025?` *and press Enter.*
+*Press **Alt+4**. It types* `How much land burned in the Los Angeles wildfire in 2025?` *and sends it.*
 
 *Drag the slider; the blue area is the burn scar.*
 

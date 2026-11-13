@@ -610,10 +610,29 @@
   };
 
   const SCENES = { 1: ['Palm Jumeirah 2001 to 2008', 'palm_jumeirah'], 2: ['UAE flood, April 2024', 'dubai_flood_2024'], 3: ['Did Lake Mead shrink?', null], 4: ['Palisades fire, Los Angeles 2025', 'la_palisades_2025'] };
+  // Presenter helper: Alt+1..4 types the demo question into the chat like a person would, then sends it. Esc stops it.
+  const DEMO = { 1: 'Show me the land reclamation of Palm Jumeirah from 2001 to 2008', 2: 'How much did Lake Mead shrink during the drought?',
+                 3: 'Show me the UAE flood in April 2024', 4: 'How much land burned in the Los Angeles wildfire in 2025?' };
+  let demoRun = 0;
+  async function demoType(text) {
+    const run = ++demoRun;                                           // pressing again restarts
+    if (app.classList.contains('chat-closed')) toggleChat(true);
+    q.focus(); q.value = '';
+    for (const ch of text) {
+      if (run !== demoRun) return;
+      q.value += ch; q.dispatchEvent(new Event('input'));
+      await sleep(30 + Math.random() * 60 + (ch === ' ' ? 40 : 0) + (Math.random() < 0.04 ? 200 : 0));   // uneven, like real typing
+    }
+    await sleep(500);
+    if (run === demoRun) $('#composer').requestSubmit();
+  }
+
   document.addEventListener('keydown', e => {
+    const dk = e.altKey && !e.ctrlKey && /^Digit[1-4]$/.test(e.code) && e.code.slice(5);
+    if (dk) { e.preventDefault(); demoType(DEMO[dk]); return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); sInput.focus(); sInput.select(); return; }
     const typing = e.target.closest('input, textarea, [contenteditable]');
-    if (e.key === 'Escape') { if (!pop.hidden) pop.hidden = true; if (!$('#drawer').hidden) openDrawer(false); return; }
+    if (e.key === 'Escape') { demoRun++; if (!pop.hidden) pop.hidden = true; if (!$('#drawer').hidden) openDrawer(false); return; }
     if (typing || e.ctrlKey || e.metaKey || e.altKey || document.querySelector('dialog[open]')) return;
     const k = e.key.toLowerCase();
     if (k === 'c') toggleChat();
