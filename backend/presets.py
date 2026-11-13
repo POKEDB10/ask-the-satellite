@@ -32,6 +32,12 @@ PRESETS = {
     "aral_sea": P("Aral Sea east basin", [59.0, 43.9, 61.6, 45.8], "2000-08-15", "2014-08-19", "mndwi", "landsat", 120,
                   ["aral sea", "aral", "بحر آرال", "بحر ارال"],
                   "NASA Earth Observatory reported the east basin completely dried by 19 August 2014.", win=(45, 45), max_cloud=60, verify=True),
+    "la_palisades_2025": P("Palisades fire, Los Angeles 2025", [-118.720, 34.020, -118.480, 34.130], "2024-12-28", "2025-01-27", "nbr", "sentinel-2", 20,
+                           ["palisades fire", "pacific palisades", "los angeles fire", "los angeles wildfire", "la fire", "la wildfire", "la fires", "malibu fire", "حريق لوس أنجلوس"],
+                           "The Palisades fire started on 7 January 2025 in a Santa Ana wind storm and destroyed 6,837 structures; with the Eaton fire it burned 37,469 acres (CBS News).", win=(12, 12), max_cloud=60),
+    "la_eaton_2025": P("Eaton fire, Altadena 2025", [-118.200, 34.150, -118.020, 34.250], "2024-12-28", "2025-01-27", "nbr", "sentinel-2", 20,
+                       ["eaton fire", "altadena", "altadena fire", "pasadena fire"],
+                       "The Eaton fire started on 7 January 2025 in a Santa Ana wind storm and destroyed 9,418 buildings; with the Palisades fire it burned 37,469 acres (CBS News).", win=(12, 12), max_cloud=60),
     # ---- tier B ----
     "palm_jebel_ali": P("Palm Jebel Ali", box(24.99, 54.98), "2001-05-22", "2008-05-17", "mndwi", "landsat", 30, ["jebel ali", "palm jebel ali"],
                         "USGS notes it was built in the early 2000s and suspended in 2009.", "B", (45, 45), 60, True),

@@ -79,9 +79,11 @@
     try { presets = await api('/api/presets'); } catch { presets = []; }
     const frames = cfg.frames || {};
     const ready = presets.filter(p => p.cached || (frames[p.id] || []).length);
+    const yr = d => (d || '').slice(0, 4), span = p => yr(p.before) === yr(p.after) ? `${fmtDate(p.before)} to ${fmtDate(p.after)}` : `${yr(p.before)} to ${yr(p.after)}`;   // target dates; the scene picker may shift them a few days
     const html = ready.map(p => `<button class="story" data-id="${esc(p.id)}" data-title="${esc(p.title)}">
         ${p.cached ? `<img src="${esc(p.thumb)}" alt="" loading="lazy">` : '<span class="ph"></span>'}
-        <span><b>${esc(p.title)}</b><small>Measured · ${p.tier === 'A' ? 'core story' : 'extra'}</small></span></button>`).join('');
+        <span><b>${esc(p.title)}</b>${p.blurb ? `<small>${esc(p.blurb)}</small>` : ''}
+        <span class="yr">${p.before ? `${esc(span(p))} · ${p.sensor === 'landsat' ? 'Landsat' : 'Sentinel-2'} · ${esc((INDEX[p.index] || [p.index])[0])}` : ''}</span></span></button>`).join('');
     $('#stories').innerHTML = html || '<p class="mut">No stories are cached yet.</p>';
     if (!$('#fatal').hidden) $('#fatal .stories').innerHTML = html;
     renderBookmarks();
@@ -191,6 +193,7 @@
     await ready;
     $('#empty') && $('#empty').remove();
     if (app.classList.contains('chat-closed')) toggleChat(true);
+    openDrawer(false);                                               // moving on: the stories drawer gets out of the way
     Globe.stopRotate();
     lastQ = { message, preset_id, hint, index: opts.index };
     const turn = document.createElement('div');
@@ -217,7 +220,7 @@
       if (!sayBox) {
         sayBox = document.createElement('div');
         sayBox.className = 'sect read';
-        sayBox.innerHTML = `<h4>${analysis ? 'Field summary' : 'Earth observation brief'}</h4><p dir="auto"></p><div class="byline">${analysis ? 'Narrated' : 'Written'} by ${esc((cfg.model || 'local model').split(':')[0])} from ${analysis ? 'the measurement and the named sources below' : 'Wikipedia'} · names and numbers checked before display</div>`;
+        sayBox.innerHTML = `<h4>${analysis ? 'What this shows' : 'About this place'}</h4><p dir="auto"></p><div class="byline">${analysis ? 'Narrated' : 'Written'} by ${esc((cfg.model || 'local model').split(':')[0])} from ${analysis ? 'the measurement and the named sources below' : 'Wikipedia'} · names and numbers checked before display</div>`;
         const anchor = body.querySelector('[data-say-anchor]');
         anchor ? anchor.after(sayBox) : body.append(sayBox);
       }
@@ -307,7 +310,7 @@
       ${m.extract ? `<p class="extract" dir="auto">${esc(m.extract)}</p>` : '<p class="extract">No encyclopedia entry found for this spot. The globe shows it in current Esri imagery.</p>'}
       ${m.url ? `<a class="src-link" href="${esc(m.url)}" target="_blank" rel="noopener noreferrer">Wikipedia${icon('i-ext')}</a>` : ''}
       <div data-say-anchor></div>
-      ${stops ? `<div class="sect"><h4>Geographic &amp; Surface Context</h4><ol class="stops">${stops}</ol></div>` : ''}
+      ${stops ? `<div class="sect"><h4>Nearby</h4><ol class="stops">${stops}</ol></div>` : ''}
       <div class="byline" style="margin-top:8px">Place notes: Wikipedia (CC BY-SA 4.0). Not measured by satellite.</div>`;
   }
 
@@ -318,13 +321,13 @@
     const st = a.stats, q = a.quality, b = a.scene_before, f = a.scene_after;
     const sign = st.net_km2 > 0 ? '+' : st.net_km2 < 0 ? '−' : '';
     const [iname, , noun] = INDEX[a.index] || [a.index, '', ''];
-    const pct = st.area_before_km2 > 0 && !q.headline_hidden ? ` · ${st.net_km2 >= 0 ? '+' : '−'}${Math.abs(100 * st.net_km2 / st.area_before_km2).toFixed(0)}%` : '';
+    const pct = st.area_before_km2 > 0 && !q.headline_hidden && a.index !== 'nbr' ? ` · ${st.net_km2 >= 0 ? '+' : '−'}${Math.abs(100 * st.net_km2 / st.area_before_km2).toFixed(0)}%` : '';
     const res = [...new Set([b, f].map(s => `${s.resolution_m} m ${s.sensor === 'landsat' ? 'Landsat' : 'Sentinel-2'}`))].join(' / ');
     const thumb = (kind, bg, label) => `<button class="th" data-lb="${kind}" title="Open ${label} full size"><span style="background-image:${bg}"></span><b>${label}</b></button>`;
     return `<section class="telemetry" dir="auto">
-        <div class="tel-top"><span class="eyebrow">Measured · ${esc(iname)}</span><span class="badge ${esc(q.confidence)}">Confidence ${esc(q.confidence)}</span></div>
+        <div class="tel-top"><span class="eyebrow">Measured with ${esc(iname)}</span><span class="badge ${esc(q.confidence)}">${esc(q.confidence[0] + q.confidence.slice(1).toLowerCase())} confidence</span></div>
         <div class="figure-row">${q.headline_hidden ? '<div class="figure hidden">Too much cloud or missing data to measure reliably</div>'
-          : `<div class="figure">${sign}${Math.abs(st.net_km2).toFixed(2)} km²</div><div class="figure-lbl">net ${noun} area${pct}</div>`}</div>
+          : `<div class="figure">${sign}${Math.abs(st.net_km2).toFixed(2)}<span class="u"> km²</span></div><div class="figure-lbl">net ${noun} area${pct}</div>`}</div>
         <div class="when">${esc(caption(b))} → ${esc(caption(f))} · analysis grid ${esc(res)}</div>
         ${q.headline_hidden ? '' : `<dl class="stats"><div><dt>Gained</dt><dd>${st.gain_km2} km²</dd></div><div><dt>Lost</dt><dd>${st.loss_km2} km²</dd></div><div><dt>Clear on both</dt><dd>${st.valid_pct_both}%</dd></div></dl>`}
         <div class="vbar" title="Share of the area measurable on both dates"><i style="width:${Math.max(0, Math.min(100, st.valid_pct_both))}%"></i></div>
@@ -361,7 +364,7 @@
   }
 
   const notesHtml = notes => (notes || []).map(n => `<div class="note" dir="auto">${esc(n)}</div>`).join('');
-  const actionsHtml = next => next && next.length ? `<div class="actions"><div class="eyebrow">Next comparison</div>${next.map(c => `<button class="act" data-next='${esc(JSON.stringify(c))}'>${esc(c.label)}${icon('i-arrow')}</button>`).join('')}</div>` : '';
+  const actionsHtml = next => next && next.length ? `<div class="actions"><div class="eyebrow">Look next</div>${next.map(c => `<button class="act" data-next='${esc(JSON.stringify(c))}'>${esc(c.label)}${icon('i-arrow')}</button>`).join('')}</div>` : '';
 
   function measuredHtml(c) {
     return `<p class="measured" dir="auto">${esc(c.measured)}</p>${c.quality ? `<p class="qtext" dir="auto">${esc(c.quality.text)}</p>` : ''}${notesHtml(c.notes)}`;
@@ -371,12 +374,12 @@
     const ctx = c.context;
     const srcs = [], cite = (title, url) => { let i = srcs.findIndex(s => s.url === url); if (i < 0) { srcs.push({ title, url }); i = srcs.length - 1; } return `<a class="cite" href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(title)}">[${i + 1}]</a>`; };
     let h = '';
-    if (c.interpretation) h += `<div class="sect"><h4>Field summary · AI hypothesis</h4><p class="ai" dir="auto">${esc(c.interpretation.text)}</p></div>`;
+    if (c.interpretation) h += `<div class="sect"><h4>A likely reading <span class="eyebrow">· model's guess, not measured</span></h4><p class="ai" dir="auto">${esc(c.interpretation.text)}</p></div>`;
     if (ctx && ((ctx.what_happened || []).length || (ctx.downsides || []).length || (ctx.counterpoints || []).length)) {
-      h += `<div class="sect"><h4>From named sources, not measured by satellite</h4>`;
+      h += `<div class="sect"><h4>Background <span class="eyebrow">· from the sources listed, not from the satellite</span></h4>`;
       if ((ctx.what_happened || []).length) h += `<div class="eyebrow sub-h">What happened</div><ul class="ctx-list">${ctx.what_happened.map(x => `<li dir="auto">${esc(x.text)}${cite(x.source_title, x.source_url)}</li>`).join('')}</ul>`;
-      if ((ctx.downsides || []).length) h += `<div class="eyebrow sub-h">Reported environmental impacts</div><ul class="ctx-list">${ctx.downsides.map(x => `<li dir="auto">${esc(x.text)}${cite(x.source_title, x.source_url)}${x.disputed ? `<span class="tag-d">Disputed by developer</span>${x.disputed_note ? `<span class="dispute">${esc(x.disputed_note.replace(/^Disputed by developer:\s*/i, ''))}</span>` : ''}` : ''}</li>`).join('')}</ul>`;
-      if ((ctx.counterpoints || []).length) h += `<div class="eyebrow sub-h">Counterpoints · developer and scientist statements</div><ul class="ctx-list">${ctx.counterpoints.map(x => `<li dir="auto">${esc(x.text)}${cite(x.source_title, x.source_url)}</li>`).join('')}</ul>`;
+      if ((ctx.downsides || []).length) h += `<div class="eyebrow sub-h">Reported impacts</div><ul class="ctx-list">${ctx.downsides.map(x => `<li dir="auto">${esc(x.text)}${cite(x.source_title, x.source_url)}${x.disputed ? `<span class="tag-d">Disputed by developer</span>${x.disputed_note ? `<span class="dispute">${esc(x.disputed_note.replace(/^Disputed by developer:\s*/i, ''))}</span>` : ''}` : ''}</li>`).join('')}</ul>`;
+      if ((ctx.counterpoints || []).length) h += `<div class="eyebrow sub-h">The other side</div><ul class="ctx-list">${ctx.counterpoints.map(x => `<li dir="auto">${esc(x.text)}${cite(x.source_title, x.source_url)}</li>`).join('')}</ul>`;
       h += `<ol class="sources">${srcs.map(s => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a></li>`).join('')}</ol></div>`;
     }
     return h + actionsHtml(c.next);
@@ -600,7 +603,7 @@
     if (v) { q.value = ''; q.style.height = 'auto'; ask(v); }
   };
 
-  const SCENES = { 1: ['Palm Jumeirah 2001 to 2008', 'palm_jumeirah'], 2: ['UAE flood, April 2024', 'dubai_flood_2024'], 3: ['Did Lake Mead shrink?', null] };
+  const SCENES = { 1: ['Palm Jumeirah 2001 to 2008', 'palm_jumeirah'], 2: ['UAE flood, April 2024', 'dubai_flood_2024'], 3: ['Did Lake Mead shrink?', null], 4: ['Palisades fire, Los Angeles 2025', 'la_palisades_2025'] };
   document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); sInput.focus(); sInput.select(); return; }
     const typing = e.target.closest('input, textarea, [contenteditable]');

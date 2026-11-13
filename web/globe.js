@@ -7,7 +7,7 @@
   const ESRI_URL = 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer';
   const ESRI_KEYED_URL = 'https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer';
   const LABELS_URL = 'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer';
-  const ORBIT = { lon: 52, lat: 20, h: 1.9e7 };
+  const ORBIT = { lon: 52, lat: 20, h: 2.6e7 };
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const $ = id => document.getElementById(id);
   const on = {}, emit = (n, d) => (on[n] || []).forEach(f => f(d));
@@ -53,7 +53,7 @@
     scene.splitPosition = st.split;
     camera.percentageChanged = 0.002;
     camera.setView({ destination: C.Cartesian3.fromDegrees(ORBIT.lon, ORBIT.lat, ORBIT.h) });
-    recenter();
+    settle(true);
 
     const lost = err => { viewer.useDefaultRenderLoop = false; emit('fatal', err); };
     scene.canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); lost(new Error('The graphics context was lost.')); });
@@ -155,10 +155,51 @@
   }
 
   // ------------------------------------------------------------ camera: zoom out to orbit, turn the globe, zoom in
-  function rectFor(bbox, pad = 0.18) {
+  // The chat covers the right of the canvas, which never resizes. High up, the camera is yawed right by yawAt(h) so the
+  // Earth sits in the visible part; low down there is no yaw and flights widen the view eastwards instead (rectFor).
+  // The yaw is a function of altitude only and is always taken out before reading heading/pitch (basePose), so zoom,
+  // flights and the compass never mistake it for "looking east".
+  const ORBIT_LO = 2.5e6, ORBIT_HI = 6e6;
+  function yawFull() {
+    const cv = scene.canvas, W = cv.clientWidth || 1, H = cv.clientHeight || 1;
+    const tanHalfX = Math.tan(camera.frustum.fov / 2) * (W >= H ? 1 : W / H);   // Cesium's fov spans the larger dimension
+    return st.inset ? Math.atan(st.inset / W * tanHalfX) : 0;
+  }
+  const yawAt = h => yawFull() * smooth(ORBIT_LO, ORBIT_HI, h);
+  let scratch;
+  function view(lon, lat, h, heading = 0, pitch = -C.Math.PI_OVER_TWO, yaw = yawAt(h)) {   // pose for a spot, inset yaw applied
+    scratch = scratch || new C.Camera(scene);
+    const destination = C.Cartesian3.fromRadians(lon, lat, h);
+    scratch.setView({ destination, orientation: { heading, pitch, roll: 0 } });
+    if (yaw) scratch.lookRight(yaw);
+    return { destination, orientation: { direction: C.Cartesian3.clone(scratch.direction), up: C.Cartesian3.clone(scratch.up) } };
+  }
+  function basePose(yaw = yawAt(camera.positionCartographic.height)) {   // the camera's heading and pitch with the inset yaw taken out
+    scratch = scratch || new C.Camera(scene);
+    scratch.setView({ destination: camera.positionWC, orientation: { direction: camera.directionWC, up: camera.upWC } });
+    if (yaw) scratch.lookLeft(yaw);
+    return { heading: scratch.heading, pitch: scratch.pitch };
+  }
+  const angle = (a, b) => Math.acos(Math.min(1, Math.max(-1, C.Cartesian3.dot(a, b))));
+
+  // After any movement: above ORBIT_LO keep the view nadir, north-up and centred beside the chat; below it, drop yaw a
+  // wheel-zoom carried down from orbit (Cesium's own controls never roll, so a roll is that leftover yaw).
+  function settle(instant = false) {
+    if (!camera || flight || st.spinning) return;
+    const c = camera.positionCartographic;
+    let t;
+    if (c.height >= ORBIT_LO) t = view(c.longitude, c.latitude, c.height);
+    else if (Math.abs(Math.sin(camera.roll)) > 0.02) t = view(c.longitude, c.latitude, c.height, basePose(yawFull()).heading, -C.Math.PI_OVER_TWO, 0);
+    else return;
+    if (angle(camera.directionWC, t.orientation.direction) < 0.004 && angle(camera.upWC, t.orientation.up) < 0.004) return;
+    if (instant || reduce) { camera.setView(t); scene.requestRender(); }
+    else camera.flyTo({ ...t, duration: 0.5, easingFunction: C.EasingFunction.QUADRATIC_IN_OUT });
+  }
+
+  function rectFor(bbox, wide = 1, pad = 0.18) {
     const [w, s, e, n] = bbox, pw = (e - w) * pad, ph = (n - s) * pad;
-    // the chat panel covers the right of the canvas: widen the view eastwards so the place sits in the visible part
-    const frac = Math.min(0.6, Math.max(0, st.inset / (scene.canvas.clientWidth || 1)));
+    // widen the view eastwards so the place sits in the part of the canvas the chat does not cover
+    const frac = Math.min(0.6, Math.max(0, st.inset / (scene.canvas.clientWidth || 1))) * wide;
     const extra = (e - w + 2 * pw) * frac / (1 - frac);
     return C.Rectangle.fromDegrees(w - pw, s - ph, e + pw + extra, n + ph);
   }
@@ -169,13 +210,20 @@
   function flyTo(bbox) {
     if (!camera) return { duration: 0, done: Promise.resolve(false) };
     cancelFlight(); stopSpin(); touch();
-    const s = camera.positionCartographic.clone(), d = C.Cartographic.fromCartesian(camera.getRectangleCameraCoordinates(rectFor(bbox)));
+    if (st.analysis) {                                              // going somewhere else: put the measured layers and swipe away
+      const [w, so, e, n] = st.analysis.bounds, cx = (bbox[0] + bbox[2]) / 2, cy = (bbox[1] + bbox[3]) / 2;
+      if (cx < w || cx > e || cy < so || cy > n) hideAnalysis();
+    }
+    const s = camera.positionCartographic.clone(), at = wide => C.Cartographic.fromCartesian(camera.getRectangleCameraCoordinates(rectFor(bbox, wide)));
+    let d = at(0);
+    const kd = smooth(ORBIT_LO, ORBIT_HI, d.height);               // landing high up: the yaw centres it, so widen less
+    if (kd < 1) d = at(1 - kd);
     d.height = Math.max(d.height, 900);
     const a = unit(s), b = unit(d), ang = Math.acos(Math.min(1, Math.max(-1, C.Cartesian3.dot(a, b))));
     const far = ang > 0.3, mid = ang > 0.04;
     const peak = far ? Math.max(1.5e7, s.height, d.height) : mid ? Math.max(s.height, d.height, ang * 1.6e7) : Math.max(s.height, d.height) * 1.6;
     const duration = reduce ? 0.8 : far ? 6.2 : mid ? 4 : 2.2;
-    const h0 = camera.heading, p0 = camera.pitch, ls = Math.log(s.height), lp = Math.log(peak), ld = Math.log(d.height);
+    const { heading: h0, pitch: p0 } = basePose(), ls = Math.log(s.height), lp = Math.log(peak), ld = Math.log(d.height);
     const goingUp = s.height < peak * 0.9;
     const f = { cancelled: false, duration };
     flight = f;
@@ -195,8 +243,7 @@
         }
         const lon = Math.atan2(v.y, v.x), lat = Math.asin(Math.max(-1, Math.min(1, v.z / C.Cartesian3.magnitude(v))));
         const o = smooth(0, 0.35, t);
-        camera.setView({ destination: C.Cartesian3.fromRadians(lon, lat, Math.exp(lh)),
-                         orientation: { heading: lerpAngle(h0, 0, o), pitch: p0 + (-C.Math.PI_OVER_TWO - p0) * o, roll: 0 } });
+        camera.setView(view(lon, lat, Math.exp(lh), lerpAngle(h0, 0, o), p0 + (-C.Math.PI_OVER_TWO - p0) * o));
         scene.requestRender();
         if (t < 1) requestAnimationFrame(step);
         else { if (flight === f) flight = null; scene.requestRender(); resolve(true); }
@@ -207,33 +254,22 @@
   }
   const lerpAngle = (a, b, t) => { let d = ((b - a + Math.PI) % (2 * Math.PI)) - Math.PI; if (d < -Math.PI) d += 2 * Math.PI; return a + d * t; };
 
-  // At orbit, centre the Earth in the part of the canvas the chat does not cover: yaw the camera by atan(inset/W * tan(fov/2)).
-  function recenter() {
-    if (!camera || flight) return;
-    const c = camera.positionCartographic, cv = scene.canvas, W = cv.clientWidth || 1, H = cv.clientHeight || 1;
-    if (c.height < 5e6) return;
-    camera.setView({ destination: C.Cartesian3.fromRadians(c.longitude, c.latitude, c.height), orientation: { heading: 0, pitch: -C.Math.PI_OVER_TWO, roll: 0 } });
-    const tanHalfX = Math.tan(camera.frustum.fov / 2) * (W >= H ? 1 : W / H);   // Cesium's fov spans the larger dimension
-    if (st.inset) camera.lookRight(Math.atan(st.inset / W * tanHalfX));
-    scene.requestRender();
-  }
-
-  function orbitHeight() {                                          // finish the reset at orbit height rather than the tiny box
-    cancelFlight();
+  function orbitHeight() {                                          // back to orbit: straight to the inset-centred view, nothing snaps on landing
+    cancelFlight(); hideAnalysis();
     const c = camera.positionCartographic;
-    camera.flyTo({ destination: C.Cartesian3.fromRadians(c.longitude, Math.max(-0.6, Math.min(0.6, c.latitude)), ORBIT.h),
-                   orientation: { heading: 0, pitch: -C.Math.PI_OVER_TWO, roll: 0 }, duration: reduce ? 0.8 : 3, easingFunction: C.EasingFunction.QUADRATIC_IN_OUT,
-                   complete: () => { recenter(); touch(-25000); } });
+    camera.flyTo({ ...view(c.longitude, Math.max(-0.6, Math.min(0.6, c.latitude)), ORBIT.h),
+                   duration: reduce ? 0.8 : 3, easingFunction: C.EasingFunction.QUADRATIC_IN_OUT,
+                   complete: () => touch(-25000) });
   }
 
-  function centerTarget() {
+  function centerTarget() {                                         // ground point at the centre of the uncovered part of the canvas
     const c = scene.canvas;
-    return camera.pickEllipsoid(new C.Cartesian2(c.clientWidth / 2, c.clientHeight / 2));
+    return camera.pickEllipsoid(new C.Cartesian2((c.clientWidth - st.inset) / 2, c.clientHeight / 2));
   }
   let tilted = false;
   function tilt(want) {
     const target = centerTarget();
-    if (!target) return tilted;
+    if (!target || camera.positionCartographic.height >= ORBIT_LO) return (tilted = false);   // the orbit view is always straight down
     tilted = want === undefined ? !tilted : want;
     const range = C.Cartesian3.distance(camera.positionWC, target);
     camera.flyToBoundingSphere(new C.BoundingSphere(target, 0), {
@@ -243,14 +279,14 @@
   }
   function northUp() {
     const target = centerTarget();
-    if (!target) return;
+    if (!target || camera.positionCartographic.height >= ORBIT_LO) return settle();
     camera.flyToBoundingSphere(new C.BoundingSphere(target, 0), {
       offset: new C.HeadingPitchRange(0, camera.pitch, C.Cartesian3.distance(camera.positionWC, target)), duration: reduce ? 0 : 0.6 });
   }
-  const zoom = k => {
-    const h = camera.positionCartographic.height;
-    camera.flyTo({ destination: C.Cartesian3.fromRadians(camera.positionCartographic.longitude, camera.positionCartographic.latitude, k > 0 ? h * 0.5 : Math.min(3e7, h * 2)),
-                   orientation: { heading: camera.heading, pitch: camera.pitch, roll: 0 }, duration: reduce ? 0 : 0.45, easingFunction: C.EasingFunction.QUADRATIC_OUT });
+  const zoom = k => {                                               // straight up or down; keeps the map's heading and tilt, never the yaw
+    cancelFlight(); touch();
+    const c = camera.positionCartographic, h = k > 0 ? c.height * 0.5 : Math.min(3e7, c.height * 2), b = basePose();
+    camera.flyTo({ ...view(c.longitude, c.latitude, h, b.heading, b.pitch), duration: reduce ? 0 : 0.45, easingFunction: C.EasingFunction.QUADRATIC_OUT });
   };
 
   // ------------------------------------------------------------ spin when idle at orbit
@@ -264,12 +300,14 @@
   }, 1000);
 
   // ------------------------------------------------------------ overlays (measured layers) and swipe
+  const visibleMid = () => Math.max(0.1, (1 - st.inset / (scene.canvas.clientWidth || 1)) / 2);
   function clearOverlays() { for (const k of Object.keys(ov)) { viewer.imageryLayers.remove(ov[k], true); delete ov[k]; } }
   const ALPHA = () => ({ before: 1, after: 1, change: st.projector ? 0.92 : 0.9, mask: 1 });
 
   function showAnalysis(a) {
     st.analysis = a;
     if (!viewer) return;
+    st.split = visibleMid();                                        // swipe starts in the middle of what you can see, not under the chat
     clearOverlays();
     const [w, s, e, n] = a.bounds, rectangle = C.Rectangle.fromDegrees(w, s, e, n);
     const mk = (url, nearest) => {
@@ -314,6 +352,7 @@
     $('swipe').hidden = !(st.analysis && (split || today));
     scene.splitPosition = st.split;
     $('swipe').style.setProperty('--split', (st.split * 100).toFixed(2) + '%');
+    $('swipe').style.setProperty('--inset', st.inset + 'px');
     emit('compare', { mode: st.compare, swipe: split || today });
     scene.requestRender();
   }
@@ -346,19 +385,19 @@
     const h = $('swipeHandle');
     const move = e => {
       const r = cv.getBoundingClientRect();
-      st.split = Math.min(0.98, Math.max(0.02, (e.clientX - r.left) / r.width));
+      st.split = Math.min(visibleMid() * 2 - 0.02, Math.max(0.02, (e.clientX - r.left) / r.width));
       h.setAttribute('aria-valuenow', Math.round(st.split * 100));
       applyCompare();
     };
     h.addEventListener('pointerdown', e => { h.setPointerCapture(e.pointerId); h.addEventListener('pointermove', move); });
     h.addEventListener('pointerup', e => { h.releasePointerCapture(e.pointerId); h.removeEventListener('pointermove', move); });
     h.addEventListener('keydown', e => {
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { st.split = Math.min(0.98, Math.max(0.02, st.split + (e.key === 'ArrowLeft' ? -0.02 : 0.02))); applyCompare(); e.preventDefault(); }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { st.split = Math.min(visibleMid() * 2 - 0.02, Math.max(0.02, st.split + (e.key === 'ArrowLeft' ? -0.02 : 0.02))); applyCompare(); e.preventDefault(); }
     });
   }
 
   function wireQuality() {
-    camera.moveEnd.addEventListener(() => scene.requestRender());
+    camera.moveEnd.addEventListener(() => { scene.requestRender(); settle(); });
     let last = null, win = [], since = null;                       // governor: median FPS under 30 for 5 s while moving -> back off
     const LADDER = [() => { scene.msaaSamples = 1; }, () => { viewer.resolutionScale = 1; }, () => { scene.postProcessStages.fxaa.enabled = false; }];
     scene.postRender.addEventListener(() => {
@@ -501,9 +540,9 @@
     toggleSwipe() { st.swipe = !st.swipe; applyCompare(); return st.swipe; },
     setBasemap(kind) { st.basemap = kind; applyBasemap(); },
     setSpin(v) { st.spin = v && !reduce; try { localStorage.setItem('ats.spin', v ? '1' : '0'); } catch { /* convenience only */ } if (!v) stopSpin(); else touch(-25000); },
-    setInset(px) { if (px !== st.inset) { st.inset = px; recenter(); } },
+    setInset(px) { if (px !== st.inset) { st.inset = px; if (st.analysis) { st.split = visibleMid(); applyCompare(); } settle(); } },
     setProjector(v) { st.projector = v; if (ov.change) ov.change.alpha = ALPHA().change; scene && scene.requestRender(); },
-    resize() { if (viewer) { viewer.resize(); scene.requestRender(); hud(); } },
+    resize() { if (viewer) { viewer.resize(); settle(true); scene.requestRender(); hud(); } },
     get state() { return st; },
     get viewer() { return viewer; },
   };

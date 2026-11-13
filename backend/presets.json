@@ -31,5 +31,37 @@
       {"label": "Before | Today", "action": "before_today"},
       {"label": "Palm Jebel Ali", "message": "Show Palm Jebel Ali", "preset_id": "palm_jebel_ali"}
     ]
+  },
+  "la_palisades_2025": {
+    "context": {
+      "what_happened": [
+        {"text": "The Palisades and Eaton fires both started on 7 January 2025, during a Santa Ana wind storm with gusts near 100 mph that grounded firefighting aircraft.", "source_title": "CBS News, 31 Jan 2025", "source_url": "https://www.cbsnews.com/news/los-angeles-palisades-eaton-fire-full-containment"},
+        {"text": "The Palisades fire destroyed 6,837 structures in and around Pacific Palisades.", "source_title": "CBS News, 31 Jan 2025", "source_url": "https://www.cbsnews.com/news/los-angeles-palisades-eaton-fire-full-containment"},
+        {"text": "Together the two fires burned 37,469 acres (about 152 km2) and killed 29 people; CAL FIRE reported both at 100% containment by 31 January.", "source_title": "CBS News, 31 Jan 2025", "source_url": "https://www.cbsnews.com/news/los-angeles-palisades-eaton-fire-full-containment"}
+      ],
+      "downsides": [],
+      "counterpoints": [],
+      "milestones": [{"year": 2025, "month": 1, "day": 7, "text": "Fire started 7 Jan 2025"}]
+    },
+    "next": [
+      {"label": "Eaton fire, Altadena", "message": "Eaton fire 2025", "preset_id": "la_eaton_2025"},
+      {"label": "Before | Today", "action": "before_today"}
+    ]
+  },
+  "la_eaton_2025": {
+    "context": {
+      "what_happened": [
+        {"text": "The Palisades and Eaton fires both started on 7 January 2025, during a Santa Ana wind storm with gusts near 100 mph that grounded firefighting aircraft.", "source_title": "CBS News, 31 Jan 2025", "source_url": "https://www.cbsnews.com/news/los-angeles-palisades-eaton-fire-full-containment"},
+        {"text": "The Eaton fire destroyed 9,418 buildings, mostly in Altadena; 17 of the 29 deaths were found in the Eaton fire zone.", "source_title": "CBS News, 31 Jan 2025", "source_url": "https://www.cbsnews.com/news/los-angeles-palisades-eaton-fire-full-containment"},
+        {"text": "Together the two fires burned 37,469 acres (about 152 km2) and killed 29 people; CAL FIRE reported both at 100% containment by 31 January.", "source_title": "CBS News, 31 Jan 2025", "source_url": "https://www.cbsnews.com/news/los-angeles-palisades-eaton-fire-full-containment"}
+      ],
+      "downsides": [],
+      "counterpoints": [],
+      "milestones": [{"year": 2025, "month": 1, "day": 7, "text": "Fire started 7 Jan 2025"}]
+    },
+    "next": [
+      {"label": "Palisades fire", "message": "Palisades fire 2025", "preset_id": "la_palisades_2025"},
+      {"label": "Before | Today", "action": "before_today"}
+    ]
   }
 }

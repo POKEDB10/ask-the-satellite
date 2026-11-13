@@ -121,7 +121,8 @@ def health():
 
 @app.get("/api/presets")
 def list_presets():
-    return [dict(id=k, title=v["title"], tier=v["tier"], cached=(CACHE / "presets" / k / "result.json").exists(), thumb=f"/cache/presets/{k}/rgb_after.png")
+    return [dict(id=k, title=v["title"], tier=v["tier"], cached=(CACHE / "presets" / k / "result.json").exists(), thumb=f"/cache/presets/{k}/rgb_after.png",
+                 blurb=v["context"], before=v["before"], after=v["after"], sensor=v["sensor"], index=v["index"])
             for k, v in presets.PRESETS.items()]
 
 

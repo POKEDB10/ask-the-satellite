@@ -23,7 +23,8 @@ def _warm():
 
 PREWARM = [("Compare the Palm Jumeirah reclamation between 2000 and 2001", None), ("Palm Jumeirah 2001 to 2008", "palm_jumeirah"),
            ("Palm Jumeirah 2001 to 2024", None), ("Did Lake Mead shrink?", None), ("UAE flood April 2024", None),
-           ("Show Palm Jebel Ali", "palm_jebel_ali"), ("Did the Aral Sea shrink?", "aral_sea"), ("Dubai", None), ("Kyoto", None),
+           ("Show Palm Jebel Ali", "palm_jebel_ali"), ("Did the Aral Sea shrink?", "aral_sea"),
+           ("Palisades fire, Los Angeles 2025", "la_palisades_2025"), ("Eaton fire 2025", "la_eaton_2025"), ("Dubai", None), ("Kyoto", None),
            ("Burj Khalifa", None), ("Palm Jumeirah", None), ("أظهر لي جزيرة نخلة جميرا قبل وبعد", None)]
 
 
@@ -178,13 +179,13 @@ def _milestone_note(a, pid):
     if not ms:
         return None
     d0, d1 = dt.date.fromisoformat(a["scene_before"]["day"]), dt.date.fromisoformat(a["scene_after"]["day"])
-    inside = [m for m in ms if d0 <= dt.date(m["year"], m.get("month") or 1, 1) <= d1]
-    if inside:
+    when = lambda m: dt.date(m["year"], m.get("month") or 1, m.get("day") or 1)
+    if any(d0 <= when(m) <= d1 for m in ms):
         return None
-    first = min(ms, key=lambda m: (m["year"], m.get("month") or 1))
-    if dt.date(first["year"], first.get("month") or 1, 1) > d1:
+    first = min(ms, key=when)
+    if when(first) > d1:
         return f"{first['text']}; this window mostly predates it."
-    return f"{max(ms, key=lambda m: (m['year'], m.get('month') or 1))['text']}; this window comes after it."
+    return f"{max(ms, key=when)['text']}; this window comes after it."
 
 
 def _nearest_preset(center):

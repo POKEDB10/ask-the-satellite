@@ -89,5 +89,30 @@
   ],
   "model": "qwen2.5:7b-instruct-q4_K_M",
   "at": "2026-11-13"
+ },
+ "change|presets:palm_jumeirah__2001_2008_ndvi|en": {
+  "sentences": [
+   "The vegetated area grew by 0.1 km² (+13%) between 2001-05-22 and 2008-05-17.",
+   "According to The National, residential buildings began in 2006."
+  ],
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "at": "2026-11-13"
+ },
+ "change|presets:la_palisades_2025|en": {
+  "sentences": [
+   "The burned area grew by 93.4 km² between the two dates, as measured by Sentinel-2A and Sentinel-2C.",
+   "According to CBS News, the Palisades and Eaton fires started on 7 January 2025 during a severe Santa Ana wind storm.",
+   "Reported implications include extensive destruction and loss of life."
+  ],
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "at": "2026-11-13"
+ },
+ "change|presets:la_eaton_2025|en": {
+  "sentences": [
+   "The burned area grew by 33.7 km² between the two dates, as measured by Sentinel-2A and Sentinel-2C.",
+   "According to CBS News, the fires started during a Santa Ana wind storm."
+  ],
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "at": "2026-11-13"
  }
 }

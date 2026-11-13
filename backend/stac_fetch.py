@@ -64,7 +64,7 @@ def search_days(bbox, date, sensor="sentinel-2", window_days=30, max_cloud=40, s
     return rows, source
 
 
-def load_day(items, bbox, res, sensor="sentinel-2", source="earthsearch", names=("red", "green", "blue", "nir", "swir16", "scl")):
+def load_day(items, bbox, res, sensor="sentinel-2", source="earthsearch", names=("red", "green", "blue", "nir", "swir16", "swir22", "scl")):   # swir22 feeds dNBR (burn scars)
     keymap = LS if sensor == "landsat" else S2[source]
     if sensor == "landsat":
         names = tuple("qa" if n == "scl" else n for n in names)

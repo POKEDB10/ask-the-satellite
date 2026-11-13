@@ -171,7 +171,7 @@ def measured_card(a, lang="en"):
     if q["headline_hidden"]:
         return t["hidden"].format(valid=st["valid_pct_both"])
     net, base = st["net_km2"], st["area_before_km2"]
-    pct = f" ({100 * net / base:+.0f}%)" if base > 0 else ""
+    pct = f" ({100 * net / base:+.0f}%)" if base > 0 and a["index"] != "nbr" else ""   # dNBR's "before" class is vegetation, not burn: no % base
     sb, sa = a["scene_before"], a["scene_after"]
     return t["measured"].format(db=sb["day"], sb=_plat(sb["platform"]), da=sa["day"], sa=_plat(sa["platform"]), noun=NOUN[a["index"]][lang == "ar"],
                                 verb=t["grew"] if net >= 0 else t["shrank"], net=abs(net), pct=pct, pitches=st["football_pitches"], gain=st["gain_km2"], loss=st["loss_km2"])

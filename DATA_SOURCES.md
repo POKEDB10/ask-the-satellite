@@ -14,6 +14,7 @@ Every layer and fact on screen has a source. Analysed data comes from Landsat an
 | GeoNames via the Open-Meteo geocoding API | Search type-ahead | Public API, no key, cached 6 h | GeoNames, CC BY 4.0; Open-Meteo terms (free for non-commercial use: re-check for a paid tier) |
 | Wikipedia (REST summary, geosearch, page views) | Place card, nearby highlights, the facts the guide may use | Public APIs with a contact User-Agent, cached 24 h | Text CC BY-SA 4.0; linked on every card |
 | CelesTrak NORAD GP elements (groups "resource" and "stations") | Live satellite positions and orbits | Fetched at most every 6 h, copy kept on disk for offline use; propagated in the browser with satellite.js (MIT) | Public; credit "CelesTrak". Positions are approximate |
+| Curated Los Angeles fires context (Jan 2025) | "What happened" for the Palisades and Eaton stories | `backend/presets.json`, each line with its link | CBS News, 31 Jan 2025 (start date, Santa Ana winds, 37,469 acres combined, 6,837 and 9,418 structures, 29 deaths); checked against the article on 13 Nov 2026 |
 | Curated Palm Jumeirah context | "What happened", downsides, counterpoints | `backend/presets.json`, each line with its link | Al Jazeera (27 Oct 2005); Mongabay (23 Aug 2005); The National (18 Feb 2009; 16 Jun 2023); NASA Earth Observatory; Cavalcante et al. 2011, J. Coastal Research, doi:10.2112/JCOASTRES-D-09-00177.1; Mansourmoghaddam et al. 2022, Water 14(4):634, doi:10.3390/w14040634 |
 
 Checked on 12 Nov 2026:

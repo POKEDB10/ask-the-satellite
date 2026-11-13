@@ -7,6 +7,8 @@ A Google-Earth-style globe with an evidence assistant.
 
 Every measured number comes from the change engine (`backend/change.py`). The local model only plans the question and narrates. A sentence it writes is shown only if all its numbers and proper names appear in the facts it was given.
 
+New to the project? Read the team study guide first: [docs/STUDY_GUIDE.md](docs/STUDY_GUIDE.md).
+
 ## Run it (Windows)
 
 First time, with internet:
@@ -25,7 +27,7 @@ start_demo.bat
 
 It starts Ollama, warms the model, starts the API on http://localhost:8000 and opens Chrome full screen. At startup the server also narrates the pitch stories once, so they replay instantly.
 
-- **Shortcuts:** `Ctrl K` search, `/` ask, `C` assistant, `S` swipe, `T` tilt, `O` back to orbit, `P` projector, `1` Palm 2001 to 2008, `2` UAE flood 2024, `3` Lake Mead, `Esc` close.
+- **Shortcuts:** `Ctrl K` search, `/` ask, `C` assistant, `S` swipe, `T` tilt, `O` back to orbit, `P` projector, `1` Palm 2001 to 2008, `2` UAE flood 2024, `3` Lake Mead, `4` Palisades fire 2025, `Esc` close.
 - **Globe:** the bottom-right controls are live satellites, tilt, north-up, zoom and back to orbit. The globe spins on its own after 20 s idle at orbit; turn that off under Layers.
 - **Legacy:** the original Leaflet UI is at `/legacy/`.
 - **Stage checklist:** mains power, Windows power plan "Best performance", display scaling 100%, close Slack, Discord and Overwolf, and check `ollama ps` shows `100% GPU`.
@@ -80,6 +82,7 @@ The repository includes a `Dockerfile` and a Render Blueprint (`render.yaml`). T
 - **Palm history bank:**
   - 2000, 2001 and 2003 (Landsat 7); 2008 (Landsat 5); Jan 2018 and Jan 2024 (Sentinel-2B, on the same 30 m grid).
   - Dropped: 2002 (51.7% valid), and 2004–2006 (no Landsat 5 scene for April–June in Planetary Computer).
+- **Los Angeles fires, January 2025 (dNBR, Sentinel-2, 2 Jan → 1 Feb 2025):** Palisades 93.4 km² of burn scar against a CAL FIRE perimeter of about 95 km²; Eaton 33.7 km² against about 57 km² (much of Eaton burned homes in Altadena, which shift NBR less than burned chaparral). Both HIGH confidence.
 - **Validation:** Lake Mead water 316.9 and 264.9 km² against the published benchmark's 324.1 and 267.1 km² (−2.2% and −0.8%). This is not ground truth.
 
 ## The assistant
