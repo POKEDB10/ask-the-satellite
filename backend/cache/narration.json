@@ -1,68 +1,91 @@
 {
  "change|presets:palm_jumeirah__2000_2001|en": {
   "sentences": [
-   "Between May 19, 2000, and May 22, 2001, the water area in the monitored location grew by 0.1 km², about the size of 7 football pitches.",
-   "The National reports that construction began in June 2001, and NASA Earth Observatory states that the Palm was built using dredged sand, starting in 2001.",
-   "This growth could mean the start of development, but reported downsides include environmental concerns such as coral reef destruction and beach erosion."
+   "The water area grew by 0.1 km² between 2000 and 2001.",
+   "Beaches eroded as natural currents were disrupted, reported Mongabay."
   ],
   "model": "qwen2.5:7b-instruct-q4_K_M",
-  "at": "2026-11-12"
+  "at": "2026-11-13"
  },
  "change|presets:palm_jumeirah__2001_2008|en": {
   "sentences": [
-   "Between 2001 and 2008, the water area of the Palm structure in Dubai shrank by 8.6 km², or 17%.",
-   "Construction began in June 2001, as reported by The National, and was completed by 2006, as described by NASA Earth Observatory.",
-   "This reduction could mean environmental downsides, such as beach erosion and potential loss of oxygen in the lagoon, as warned by UN University scientists."
-  ],
-  "model": "qwen2.5:7b-instruct-q4_K_M",
-  "at": "2026-11-12"
- },
- "change|presets:palm_jumeirah__2001_2024|en": {
-  "sentences": [
-   "Between 2001 and 2024, the water area of the Palm structure in Dubai shrank by 9.2 km², or 18%.",
+   "The water area shrank by 8.6 km² (-17%) between 2001 and 2008.",
    "According to The National, construction began in June 2001, and residential buildings started in 2006."
   ],
   "model": "qwen2.5:7b-instruct-q4_K_M",
-  "at": "2026-11-12"
+  "at": "2026-11-13"
+ },
+ "change|presets:palm_jumeirah__2001_2024|en": {
+  "sentences": [
+   "The water area shrank by 9.2 km² (-18%) between 2001-05-22 and 2024-01-23.",
+   "According to The National, construction began in June 2001, and residential buildings started in 2006."
+  ],
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "at": "2026-11-13"
  },
  "change|presets:lake_mead|en": {
   "sentences": [
-   "Between 2019-08-14 and 2022-09-07, the water area of the reservoir shrank by 47.6 km², or about 15%."
+   "The water area of the reservoir shrank by 47.6 km² (-15%) between 2019 and 2022, as measured by Sentinel-2B.",
+   "Reported implications include reduced water levels and decreased ecosystem health."
   ],
   "model": "qwen2.5:7b-instruct-q4_K_M",
-  "at": "2026-11-12"
+  "at": "2026-11-13"
  },
  "change|presets:dubai_flood_2024|en": {
   "sentences": [
-   "Between 2024-04-12 and 2024-04-22, the flooded area grew by 6.6 km² (+106%), about 921 football pitches.",
-   "According to The National Center of Meteorology, the UAE experienced its heaviest rainfall since 1949 on 16 April 2024, with 254.8 mm of rain in under 24 hours at Khatm Al Shakla.",
-   "This heavy rainfall could be the cause of the increased flooded area, but reported downsides include potential flooding impacts and infrastructure damage."
+   "The flooded area grew by 6.6 km² (+106%) between April 12 and 22, 2024.",
+   "According to the National Center of Meteorology, heavy rainfall on April 16, 2024, caused the flooding.",
+   "The primary environmental implication is increased water coverage in the region."
   ],
   "model": "qwen2.5:7b-instruct-q4_K_M",
-  "at": "2026-11-12"
+  "at": "2026-11-13"
+ },
+ "place|dubai|55.19|25.07|en": {
+  "sentences": [
+   "Satellite imagery would show a sprawling urban footprint with high-rise buildings, including the Burj Khalifa and Al Hekma Tower, along the coast.",
+   "The coastline features a creek and water bodies, with City Walk offering a pedestrianized area.",
+   "Nearby, the 21st Century Tower and Burj Vista add to the dense urban landscape."
+  ],
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "at": "2026-11-13"
+ },
+ "place|kyoto|135.77|35.01|en": {
+  "sentences": [
+   "Satellite imagery would show Kyoto as a densely urbanized city with a mix of modern buildings and traditional structures.",
+   "The urban footprint covers much of the central area, with parks and temples like Chōhō-ji and Honnō-ji dotting the landscape.",
+   "The Kamo River runs through the city, visible as a water body, and bridges like Sanjō Ōhashi span the river."
+  ],
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "at": "2026-11-13"
+ },
+ "place|burj khalifa|55.27|25.2|en": {
+  "sentences": [
+   "A satellite would see the Burj Khalifa as a towering structure against the Dubai skyline, with the Dubai Fountain and surrounding water bodies visible nearby.",
+   "The urban footprint shows extensive development, including other tall buildings and the Dubai Mall."
+  ],
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "at": "2026-11-13"
+ },
+ "place|palm jumeirah|55.13|25.12|en": {
+  "sentences": [
+   "Satellite imagery would show a large, crescent-shaped artificial island with a dense urban footprint, including skyscrapers like the Elite Residence.",
+   "The coastline is clearly defined, with extensive water bodies surrounding the development.",
+   "Nearby, the Palm Islands and Dubai Media City can be discerned."
+  ],
+  "model": "qwen2.5:7b-instruct-q4_K_M",
+  "at": "2026-11-13"
  },
  "change|presets:palm_jebel_ali|en": {
   "sentences": [
-   "Between 2001 and 2008, the water area in the measured location shrank by 18.4 km².",
-   "According to USGS, this change occurred as the area was built up in the early 2000s and construction was suspended in 2009, which could mean the reported downsides include environmental impacts from the development."
+   "The water area shrank by 18.4 km² (-5%) between 2001 and 2008."
   ],
   "model": "qwen2.5:7b-instruct-q4_K_M",
-  "at": "2026-11-12"
+  "at": "2026-11-13"
  },
- "change|presets:palm_jumeirah__2001_2008|ar": {
+ "change|presets:palm_jumeirah__2001_2008_ndwi|en": {
   "sentences": [
-   "بين 2001-05-22 و2008-05-17، انكمشت مساحة المياه بمقدار 8.6 كم² (-17%)، أي نحو 1,203 ملعب كرة قدم، حسبما يظهر في الصور الفضائية.",
-   "وفقًا لصحيفة \"الوطن\"، بدأ بناء جزيرة الفhma في يونيو 2001.",
-   "يمكن أن يعني هذا الانكماش تدهور البيئة البحرية، بما في ذلك تلوث المياه وإزالة المراعي البحرية، كما تقارر تقارير من \"مونغاباي\"."
-  ],
-  "model": "qwen2.5:7b-instruct-q4_K_M",
-  "at": "2026-11-12"
- },
- "place|kyoto|en": {
-  "sentences": [
-   "Kyoto is a city in the Kansai region of Japan, known for its rich cultural heritage and historical significance.",
-   "It is famous for its many temples and shrines, including the historic Honnō-ji temple.",
-   "Nearby, Nishiki Market offers a vibrant experience with its traditional foods and goods, while the Kyoto International Manga Museum is a unique destination for manga enthusiasts."
+   "The surface water area of the Palm structure shrank by 8.2 km² (-16%) between 2001-05-22 and 2008-05-17.",
+   "According to The National, construction began in June 2001, and residential buildings started in 2006."
   ],
   "model": "qwen2.5:7b-instruct-q4_K_M",
   "at": "2026-11-13"

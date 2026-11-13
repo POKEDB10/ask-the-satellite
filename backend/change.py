@@ -6,9 +6,9 @@ from scipy import ndimage
 
 SCL_BAD = (0, 1, 3, 8, 9, 10)          # no data, saturated, cloud shadow, cloud med/high, cirrus
 SCL_BAD_STRICT = SCL_BAD + (2, 7)      # + dark area, unclassified (urban flood / high-rise shadow cases)
-BANDS = {"mndwi": ("green", "swir16"), "ndvi": ("nir", "red"), "nbr": ("nir", "swir22")}
-THRESH = {"mndwi": 0.0, "ndvi": 0.3}
-LABELS = {"mndwi": ("land became water", "water became land"),
+BANDS = {"mndwi": ("green", "swir16"), "ndvi": ("nir", "red"), "nbr": ("nir", "swir22"), "ndwi": ("green", "nir")}   # ndwi: McFeeters 1996 (additive, v1.2)
+THRESH = {"mndwi": 0.0, "ndvi": 0.3, "ndwi": 0.0}
+LABELS = {"mndwi": ("land became water", "water became land"), "ndwi": ("land became water", "water became land"),
           "ndvi":  ("new vegetation", "vegetation lost"),
           "flood": ("newly flooded", "drained"),
           "nbr":   ("burn scar", "")}

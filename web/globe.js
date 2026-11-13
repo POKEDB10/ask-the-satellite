@@ -17,7 +17,7 @@
   const base = {}, ov = {};
   const st = { split: 0.5, swipe: true, compare: 'ba', want: { before: true, after: true, change: true, mask: false, labels: false },
                basemap: 'esri', esri: 'pending', spin: !reduce, spinning: false, lastInput: performance.now() - 19000, analysis: null,
-               projector: false, nativeLevel: 19 };
+               projector: false, nativeLevel: 19, inset: 0 };
   const stats = { fps: null, qualityStep: 0 };
   try { const v = localStorage.getItem('ats.spin'); if (v !== null) st.spin = v === '1' && !reduce; } catch { /* storage off: default */ }
 
@@ -36,8 +36,10 @@
     } catch (e) { emit('fatal', e); return false; }
     scene = viewer.scene; camera = scene.camera;
     const g = scene.globe;
-    viewer.resolutionScale = Math.min(window.devicePixelRatio || 1, 1.5);
-    g.maximumScreenSpaceError = 1.25; g.tileCacheSize = 600; g.preloadSiblings = false; g.preloadAncestors = true;
+    viewer.resolutionScale = Math.min(window.devicePixelRatio || 1, 2.0);
+    g.maximumScreenSpaceError = 1.0; g.tileCacheSize = 1000; g.preloadSiblings = true; g.preloadAncestors = true;
+    // requestRenderMode does not always repaint when sharper child tiles arrive after the camera stops: repaint on every tile load.
+    g.tileLoadProgressEvent.addEventListener(() => scene.requestRender());
     g.baseColor = C.Color.fromCssColorString('#0A1630');
     g.showGroundAtmosphere = true; scene.skyAtmosphere.show = true;
     // Google-Earth-like orbit look: soft light from over the viewer's shoulder, faded out when close so imagery keeps its true colours.
@@ -51,6 +53,7 @@
     scene.splitPosition = st.split;
     camera.percentageChanged = 0.002;
     camera.setView({ destination: C.Cartesian3.fromDegrees(ORBIT.lon, ORBIT.lat, ORBIT.h) });
+    recenter();
 
     const lost = err => { viewer.useDefaultRenderLoop = false; emit('fatal', err); };
     scene.canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); lost(new Error('The graphics context was lost.')); });
@@ -84,8 +87,10 @@
     C.Cartesian3.normalize(dir, scene.light.direction);
     const h = camera.positionCartographic.height;
     const esriOk = st.esri === 'ok' && st.basemap === 'esri';
-    if (base.bm) base.bm.alpha = esriOk ? smooth(1.2e6, 4.5e6, h) : 1;
-    if (base.clouds) base.clouds.alpha = 0.92 * smooth(4.5e6, 1.25e7, h);
+    // ~10 km/px orbit textures: full above 9,000 km, ramp to 0 by 3,000 km, hidden below so Esri's pyramid shows unblurred.
+    const k = smooth(3e6, 9e6, h);
+    if (base.bm) { base.bm.show = !esriOk || h > 3e6; base.bm.alpha = esriOk ? k : 1; }
+    if (base.clouds) { base.clouds.show = h > 3e6; base.clouds.alpha = 0.42 * k; }
     if (st.spinning) { camera.rotate(C.Cartesian3.UNIT_Z, -0.03 * dt); scene.requestRender(); }
   }
 
@@ -152,7 +157,10 @@
   // ------------------------------------------------------------ camera: zoom out to orbit, turn the globe, zoom in
   function rectFor(bbox, pad = 0.18) {
     const [w, s, e, n] = bbox, pw = (e - w) * pad, ph = (n - s) * pad;
-    return C.Rectangle.fromDegrees(w - pw, s - ph, e + pw, n + ph);
+    // the chat panel covers the right of the canvas: widen the view eastwards so the place sits in the visible part
+    const frac = Math.min(0.6, Math.max(0, st.inset / (scene.canvas.clientWidth || 1)));
+    const extra = (e - w + 2 * pw) * frac / (1 - frac);
+    return C.Rectangle.fromDegrees(w - pw, s - ph, e + pw + extra, n + ph);
   }
   const unit = c => new C.Cartesian3(Math.cos(c.latitude) * Math.cos(c.longitude), Math.cos(c.latitude) * Math.sin(c.longitude), Math.sin(c.latitude));
 
@@ -191,21 +199,31 @@
                          orientation: { heading: lerpAngle(h0, 0, o), pitch: p0 + (-C.Math.PI_OVER_TWO - p0) * o, roll: 0 } });
         scene.requestRender();
         if (t < 1) requestAnimationFrame(step);
-        else { if (flight === f) flight = null; idleQuality(); resolve(true); }
+        else { if (flight === f) flight = null; scene.requestRender(); resolve(true); }
       };
-      busyQuality();
       requestAnimationFrame(step);
     });
     return { duration, done };
   }
   const lerpAngle = (a, b, t) => { let d = ((b - a + Math.PI) % (2 * Math.PI)) - Math.PI; if (d < -Math.PI) d += 2 * Math.PI; return a + d * t; };
 
+  // At orbit, centre the Earth in the part of the canvas the chat does not cover: yaw the camera by atan(inset/W * tan(fov/2)).
+  function recenter() {
+    if (!camera || flight) return;
+    const c = camera.positionCartographic, cv = scene.canvas, W = cv.clientWidth || 1, H = cv.clientHeight || 1;
+    if (c.height < 5e6) return;
+    camera.setView({ destination: C.Cartesian3.fromRadians(c.longitude, c.latitude, c.height), orientation: { heading: 0, pitch: -C.Math.PI_OVER_TWO, roll: 0 } });
+    const tanHalfX = Math.tan(camera.frustum.fov / 2) * (W >= H ? 1 : W / H);   // Cesium's fov spans the larger dimension
+    if (st.inset) camera.lookRight(Math.atan(st.inset / W * tanHalfX));
+    scene.requestRender();
+  }
+
   function orbitHeight() {                                          // finish the reset at orbit height rather than the tiny box
     cancelFlight();
     const c = camera.positionCartographic;
     camera.flyTo({ destination: C.Cartesian3.fromRadians(c.longitude, Math.max(-0.6, Math.min(0.6, c.latitude)), ORBIT.h),
                    orientation: { heading: 0, pitch: -C.Math.PI_OVER_TWO, roll: 0 }, duration: reduce ? 0.8 : 3, easingFunction: C.EasingFunction.QUADRATIC_IN_OUT,
-                   complete: () => { touch(-25000); } });
+                   complete: () => { recenter(); touch(-25000); } });
   }
 
   function centerTarget() {
@@ -339,13 +357,8 @@
     });
   }
 
-  // While the camera moves, draw coarser tiles (fewer requests, steady frame rate); sharpen as soon as it stops.
-  let qTimer;
-  function busyQuality() { clearTimeout(qTimer); scene.globe.maximumScreenSpaceError = 2.6; }
-  function idleQuality() { clearTimeout(qTimer); qTimer = setTimeout(() => { scene.globe.maximumScreenSpaceError = stats.qualityStep > 2 ? 1.8 : 1.25; scene.requestRender(); }, 120); }
   function wireQuality() {
-    camera.moveStart.addEventListener(busyQuality);
-    camera.moveEnd.addEventListener(() => { if (!flight) idleQuality(); });
+    camera.moveEnd.addEventListener(() => scene.requestRender());
     let last = null, win = [], since = null;                       // governor: median FPS under 30 for 5 s while moving -> back off
     const LADDER = [() => { scene.msaaSamples = 1; }, () => { viewer.resolutionScale = 1; }, () => { scene.postProcessStages.fxaa.enabled = false; }];
     scene.postRender.addEventListener(() => {
@@ -411,7 +424,7 @@
   async function satellites(onState) {
     if (!viewer) return false;
     if (sat) {                                                     // toggle off
-      clearInterval(sat.timer); scene.primitives.remove(sat.points); scene.primitives.remove(sat.labels); scene.primitives.remove(sat.paths);
+      clearInterval(sat.timer); clearInterval(sat.trackTimer); sat.clicks && sat.clicks.destroy(); scene.primitives.remove(sat.points); scene.primitives.remove(sat.labels); scene.primitives.remove(sat.paths);
       sat = null; scene.requestRender(); return false;
     }
     sat = { loading: true };
@@ -424,22 +437,30 @@
       const points = scene.primitives.add(new C.PointPrimitiveCollection());
       const labels = scene.primitives.add(new C.LabelCollection());
       const paths = scene.primitives.add(new C.PolylineCollection());
-      const KEY = C.Color.fromCssColorString('#06B6D4'), DIM = C.Color.WHITE.withAlpha(0.75);
+      const KEY = C.Color.fromCssColorString('#14B8A6'), DIM = C.Color.fromCssColorString('rgba(148,163,184,0.32)'), NAVY = C.Color.fromCssColorString('#0B0F19');
+      const LABEL = { font: '500 11px "IBM Plex Mono", monospace', fillColor: C.Color.WHITE, outlineColor: NAVY, outlineWidth: 3,
+                      style: C.LabelStyle.FILL_AND_OUTLINE, pixelOffset: new C.Cartesian2(10, -10) };
       const pos = (rec, date) => {
         const pv = propagate(rec, date);
         if (!pv || !pv.position || typeof pv.position !== 'object') return null;
         const e = eciToEcf(pv.position, gstime(date));
         return new C.Cartesian3(e.x * 1000, e.y * 1000, e.z * 1000);
       };
-      const nice = n => n.replace('ISS (ZARYA)', 'ISS').replace(/^LANDSAT /, 'Landsat ').replace(/^SENTINEL-/, 'Sentinel-');
+      const nice = n => n.replace(/ \(.*\)$/, '').replace(/^LANDSAT /, 'Landsat ').replace(/^SENTINEL-/, 'Sentinel-');
       for (const r of recs) {
-        r.pt = points.add({ position: C.Cartesian3.ZERO, pixelSize: r.key ? 8 : 3.5, color: r.key ? KEY : DIM,
-                            outlineColor: C.Color.BLACK.withAlpha(0.6), outlineWidth: r.key ? 1.5 : 0, show: false });
-        if (r.key) r.lb = labels.add({ position: C.Cartesian3.ZERO, text: nice(r.name), font: '500 12px "IBM Plex Sans", sans-serif',
-                                        fillColor: C.Color.WHITE, outlineColor: C.Color.fromCssColorString('#0B0F19'), outlineWidth: 3,
-                                        style: C.LabelStyle.FILL_AND_OUTLINE, pixelOffset: new C.Cartesian2(10, -10), show: false });
+        r.pt = points.add({ position: C.Cartesian3.ZERO, pixelSize: r.key ? 7 : 3, color: r.key ? KEY : DIM, id: r.name,
+                            outlineColor: NAVY, outlineWidth: r.key ? 2 : 0, show: false });
+        if (r.key) r.lb = labels.add({ position: C.Cartesian3.ZERO, text: nice(r.name), show: false, ...LABEL });
       }
-      const tracks = () => {                                       // one orbit ahead for the Landsat / Sentinel-2 / ISS family
+      const picked = labels.add({ position: C.Cartesian3.ZERO, text: '', show: false, ...LABEL });   // background sats: name on click
+      const clicks = new C.ScreenSpaceEventHandler(scene.canvas);
+      clicks.setInputAction(e => {
+        const hit = scene.pick(e.position), r = hit && hit.collection === points && recs.find(x => x.pt === hit.primitive);
+        picked.show = !!(r && !r.key);
+        if (picked.show) { picked.text = nice(r.name); picked.target = r; picked.position = r.pt.position; }
+        scene.requestRender();
+      }, C.ScreenSpaceEventType.LEFT_CLICK);
+      const tracks = () => {                                       // one orbit ahead for each primary Earth-observation mission
         paths.removeAll();
         const now = Date.now();
         for (const r of recs.filter(x => x.key)) {
@@ -456,10 +477,11 @@
           r.pt.show = !!p;
           if (p) { r.pt.position = p; n++; if (r.lb) { r.lb.position = p; r.lb.show = true; } }
         }
+        if (picked.target) picked.position = picked.target.pt.position;
         scene.requestRender();
         onState && onState({ count: n, fetched: feed.fetched, source: feed.source });
       };
-      Object.assign(sat, { points, labels, paths, loading: false, timer: setInterval(tick, 1000) });
+      Object.assign(sat, { points, labels, paths, clicks, loading: false, timer: setInterval(tick, 1000) });
       tracks(); tick();
       sat.trackTimer = setInterval(() => sat && tracks(), 300000);
       return true;
@@ -479,6 +501,7 @@
     toggleSwipe() { st.swipe = !st.swipe; applyCompare(); return st.swipe; },
     setBasemap(kind) { st.basemap = kind; applyBasemap(); },
     setSpin(v) { st.spin = v && !reduce; try { localStorage.setItem('ats.spin', v ? '1' : '0'); } catch { /* convenience only */ } if (!v) stopSpin(); else touch(-25000); },
+    setInset(px) { if (px !== st.inset) { st.inset = px; recenter(); } },
     setProjector(v) { st.projector = v; if (ov.change) ov.change.alpha = ALPHA().change; scene && scene.requestRender(); },
     resize() { if (viewer) { viewer.resize(); scene.requestRender(); hud(); } },
     get state() { return st; },

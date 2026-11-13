@@ -170,12 +170,16 @@ def _nearby(center, radius_m=10000, limit=60):
                         thumb=(p.get("thumbnail") or {}).get("source"), url=p.get("fullurl"),
                         center=[r["lon"], r["lat"]], dist_km=round(r["dist"] / 1000, 1),
                         views=sum(v or 0 for v in (p.get("pageviews") or {}).values())))
-    return sorted(out, key=lambda n: -n["views"])                      # most-read first: a proxy for "worth a stop"
+    for o, r in zip(out, rows):
+        o["kind"] = r.get("type") or "landmark"
+    # geographic and hydrological features first, then infrastructure and landmarks, each by readership
+    return sorted(out, key=lambda n: (n["kind"] not in GEO, -n["views"]))
 
 
+GEO = {"waterbody", "river", "isle", "mountain", "forest", "glacier", "pass"}
 STOPS = {"landmark", "mountain", "isle", "waterbody", "forest", "river", "glacier", "pass", "edu"}   # Wikipedia coordinate types worth a stop
 BORING = re.compile(r"\b(railway station|bus station|school|college|hospital|bank|constituency|mandal|ward|tehsil|"
-                    r"village|neighbourhood|neighborhood|census|post office|road|street|highway|metro station|company|airline|battle|siege|famine|rebellion|timeline|history of|list of|election|incident|attack|earthquake)\b", re.I)
+                    r"village|neighbourhood|neighborhood|census|post office|road|street|highway|metro station|company|airline|battle|siege|famine|rebellion|timeline|history of|list of|election|incident|attack|earthquake|hotel|resort|restaurant|ristorante|cuisine|dining|bar|pub|cafe|café|nightclub|lounge|mall|shop|shopping|store|retail|boutique|brand)\b", re.I)
 
 
 def wiki(name, center):

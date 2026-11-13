@@ -12,7 +12,7 @@
   const resText = s => s.sensor === 'sentinel-2' && s.resolution_m > 10 ? `${s.resolution_m} m grid` : `${s.resolution_m} m`;
   const caption = s => `${sensorName(s.platform)} · ${resText(s)} · ${fmtDate(s.day)}`;
   const INDEX = { mndwi: ['MNDWI', '(green − SWIR1) / (green + SWIR1)', 'water'], ndvi: ['NDVI', '(NIR − red) / (NIR + red)', 'vegetated'],
-                  flood: ['MNDWI flood rule', 'before < 0, after > −0.05 and rise > 0.18', 'flooded'], nbr: ['dNBR', '(NIR − SWIR2) / (NIR + SWIR2), pre − post', 'burned'] };
+                  ndwi: ['NDWI', '(green − NIR) / (green + NIR)', 'surface water'], flood: ['MNDWI flood rule', 'before < 0, after > −0.05 and rise > 0.18', 'flooded'], nbr: ['dNBR', '(NIR − SWIR2) / (NIR + SWIR2), pre − post', 'burned'] };
   const STORY_MSG = { palm_jumeirah: 'Palm Jumeirah 2001 to 2008' };
   const icon = id => `<svg class="ico"><use href="#${id}"/></svg>`;
   const app = $('#app'), log = $('#log');
@@ -85,6 +85,7 @@
     $('#stories').innerHTML = html || '<p class="mut">No stories are cached yet.</p>';
     if (!$('#fatal').hidden) $('#fatal .stories').innerHTML = html;
     renderBookmarks();
+    initSelectors();
   }
   const BK = 'ats.bookmarks.v1';
   const getBk = () => { try { return JSON.parse(localStorage.getItem(BK)) || []; } catch { return []; } };
@@ -97,7 +98,7 @@
   document.addEventListener('click', e => {
     const s = e.target.closest('.story');
     if (!s) return;
-    if (s.dataset.bk) { const b = getBk()[+s.dataset.bk]; if (b) ask(b.message, b.preset_id, b.hint); }
+    if (s.dataset.bk) { const b = getBk()[+s.dataset.bk]; if (b) ask(b.message, b.preset_id, b.hint, { index: b.index }); }
     else ask(STORY_MSG[s.dataset.id] || s.dataset.title, s.dataset.id);
     openDrawer(false);
   });
@@ -184,14 +185,14 @@
     s.innerHTML = icon(b ? 'i-stop' : 'i-send');
   }
 
-  async function ask(message, preset_id = null, hint = null) {
+  async function ask(message, preset_id = null, hint = null, opts = {}) {
     if (!message || !message.trim()) return;
     if (current) current.stop('Stopped: you asked something new');
     await ready;
     $('#empty') && $('#empty').remove();
     if (app.classList.contains('chat-closed')) toggleChat(true);
     Globe.stopRotate();
-    lastQ = { message, preset_id, hint };
+    lastQ = { message, preset_id, hint, index: opts.index };
     const turn = document.createElement('div');
     turn.className = 'turn';
     turn.innerHTML = `<div class="q-line" dir="auto">${esc(message)}</div>
@@ -216,7 +217,7 @@
       if (!sayBox) {
         sayBox = document.createElement('div');
         sayBox.className = 'sect read';
-        sayBox.innerHTML = `<h4>${analysis ? 'The story' : 'Guide'}</h4><p dir="auto"></p><div class="byline">${analysis ? 'Narrated' : 'Written'} by ${esc((cfg.model || 'local model').split(':')[0])} from ${analysis ? 'the measurement and the named sources below' : 'Wikipedia'} · names and numbers checked before display</div>`;
+        sayBox.innerHTML = `<h4>${analysis ? 'Field summary' : 'Earth observation brief'}</h4><p dir="auto"></p><div class="byline">${analysis ? 'Narrated' : 'Written'} by ${esc((cfg.model || 'local model').split(':')[0])} from ${analysis ? 'the measurement and the named sources below' : 'Wikipedia'} · names and numbers checked before display</div>`;
         const anchor = body.querySelector('[data-say-anchor]');
         anchor ? anchor.after(sayBox) : body.append(sayBox);
       }
@@ -224,7 +225,7 @@
     };
     setBusy(true);
     try {
-      await sse('/api/chat/stream', { message, preset_id, last_analysis_id: last && last.analysis_id, place_hint: hint }, async (ev, d) => {
+      await sse('/api/chat/stream', { message, preset_id, last_analysis_id: last && last.analysis_id, place_hint: hint, index: opts.index || null }, async (ev, d) => {
         if (me !== current) return;
         if (ev === 'plan') {
           if (d.fly_to && d.fly_to.join() !== flownKey) {
@@ -248,6 +249,7 @@
             if (flight) await Promise.race([flight.done, sleep(Math.max(0, flight.start + flight.duration * 700 - performance.now()))]);
             if (me !== current) return;
             showAnalysis(d);
+            syncSelectors(d);
             body.insertAdjacentHTML('afterbegin', reportHeadHtml(d));
             wireCompare(body.querySelector('.cmp'), d);
             pinTop();
@@ -259,7 +261,7 @@
           p.insertAdjacentHTML('beforeend', `<span class="say">${esc(d.text)} </span>`);
         } else if (ev === 'cards') {
           await reveal;
-          if (d.kind === 'analysis') body.insertAdjacentHTML('beforeend', reportRestHtml(d, analysis));
+          if (d.kind === 'analysis') { const m = body.querySelector('[data-measured]'); if (m) m.innerHTML = measuredHtml(d); body.insertAdjacentHTML('beforeend', reportRestHtml(d)); }
           else if (d.kind === 'place') body.insertAdjacentHTML('beforeend', actionsHtml(d.next));
           else body.insertAdjacentHTML('beforeend', `<div class="info ${d.kind === 'error' ? 'error' : ''}" dir="auto">${esc(d.measured)}</div>${notesHtml(d.notes)}${actionsHtml(d.next)}`);
         } else if (ev === 'done') {
@@ -305,27 +307,46 @@
       ${m.extract ? `<p class="extract" dir="auto">${esc(m.extract)}</p>` : '<p class="extract">No encyclopedia entry found for this spot. The globe shows it in current Esri imagery.</p>'}
       ${m.url ? `<a class="src-link" href="${esc(m.url)}" target="_blank" rel="noopener noreferrer">Wikipedia${icon('i-ext')}</a>` : ''}
       <div data-say-anchor></div>
-      ${stops ? `<div class="sect"><h4>Worth a stop nearby</h4><ol class="stops">${stops}</ol></div>` : ''}
+      ${stops ? `<div class="sect"><h4>Geographic &amp; Surface Context</h4><ol class="stops">${stops}</ol></div>` : ''}
       <div class="byline" style="margin-top:8px">Place notes: Wikipedia (CC BY-SA 4.0). Not measured by satellite.</div>`;
   }
 
   // ------------------------------------------------------------ rendering: change report
+  // Order: telemetry banner (figure, dates, sensors, quality) -> swipe + thumbnails -> 3-sentence field summary -> named sources -> next steps
+  const FLAG_TXT = { cross_sensor: 'Different satellites', season_mismatch: 'Season gap over 45 days', landsat7_slc_gaps: 'Landsat 7 stripe gaps', low_valid_pixels: 'Under 60% measurable' };
   function reportHeadHtml(a) {
     const st = a.stats, q = a.quality, b = a.scene_before, f = a.scene_after;
     const sign = st.net_km2 > 0 ? '+' : st.net_km2 < 0 ? '−' : '';
-    const noun = INDEX[a.index] ? INDEX[a.index][2] : '';
-    return `<div class="cmp" style="--p:50%" title="Drag to compare. Double-click for full size.">
+    const [iname, , noun] = INDEX[a.index] || [a.index, '', ''];
+    const pct = st.area_before_km2 > 0 && !q.headline_hidden ? ` · ${st.net_km2 >= 0 ? '+' : '−'}${Math.abs(100 * st.net_km2 / st.area_before_km2).toFixed(0)}%` : '';
+    const res = [...new Set([b, f].map(s => `${s.resolution_m} m ${s.sensor === 'landsat' ? 'Landsat' : 'Sentinel-2'}`))].join(' / ');
+    const thumb = (kind, bg, label) => `<button class="th" data-lb="${kind}" title="Open ${label} full size"><span style="background-image:${bg}"></span><b>${label}</b></button>`;
+    return `<section class="telemetry" dir="auto">
+        <div class="tel-top"><span class="eyebrow">Measured · ${esc(iname)}</span><span class="badge ${esc(q.confidence)}">Confidence ${esc(q.confidence)}</span></div>
+        <div class="figure-row">${q.headline_hidden ? '<div class="figure hidden">Too much cloud or missing data to measure reliably</div>'
+          : `<div class="figure">${sign}${Math.abs(st.net_km2).toFixed(2)} km²</div><div class="figure-lbl">net ${noun} area${pct}</div>`}</div>
+        <div class="when">${esc(caption(b))} → ${esc(caption(f))} · analysis grid ${esc(res)}</div>
+        ${q.headline_hidden ? '' : `<dl class="stats"><div><dt>Gained</dt><dd>${st.gain_km2} km²</dd></div><div><dt>Lost</dt><dd>${st.loss_km2} km²</dd></div><div><dt>Clear on both</dt><dd>${st.valid_pct_both}%</dd></div></dl>`}
+        <div class="vbar" title="Share of the area measurable on both dates"><i style="width:${Math.max(0, Math.min(100, st.valid_pct_both))}%"></i></div>
+        <div class="when">${st.valid_pct_both}% clear on both dates · before ${st.valid_pct_before}% · after ${st.valid_pct_after}% ·
+          <span class="why" tabindex="0" title="${esc(whyText(b))}">why these scenes?</span></div>
+        <div class="chips">${q.flags.map(x => `<span class="qchip">${esc(FLAG_TXT[x] || x)}</span>`).join('')}
+          ${st.ignored_small_km2 > 0 && !q.headline_hidden ? `<span class="qchip">Under ${st.min_mapping_unit_px} px ignored: ${st.ignored_small_km2} km²</span>` : ''}
+          <span class="qchip">Basemap not analysed</span></div>
+        <div data-measured></div>
+      </section>
+      <div class="cmp" style="--p:50%" title="Drag to compare. Double-click for full size.">
         <img src="${esc(a.layers.rgb_after)}" alt="After: ${esc(caption(f))}"><img class="chg" src="${esc(a.layers.change)}" alt="">
         <div class="b"><img src="${esc(a.layers.rgb_before)}" alt="Before: ${esc(caption(b))}"></div>
         <div class="hand"></div><span class="tag l">${esc(fmtDate(b.day))}</span><span class="tag r">${esc(fmtDate(f.day))}</span>
       </div>
       <div class="cmp-tools"><label><input type="checkbox" data-chg checked> Change</label>
-        <span class="legend"><i class="g"></i>${esc(st.gain_label)}${st.loss_label ? `<i class="l"></i>${esc(st.loss_label)}` : ''}</span>
-        <button class="ml" data-lb="after" title="Open full size" aria-label="Open full size">${icon('i-download')}</button></div>
-      <div class="figure-row">${q.headline_hidden ? '<div class="figure hidden">Too much cloud to measure reliably</div>'
-        : `<div class="figure">${sign}${Math.abs(st.net_km2).toFixed(2)} km²</div><div class="figure-lbl">net ${noun} area</div>`}</div>
-      <div class="when">${esc(caption(b))} → ${esc(caption(f))}</div>
-      ${q.headline_hidden ? '' : `<dl class="stats"><div><dt>Gained</dt><dd>${st.gain_km2} km²</dd></div><div><dt>Lost</dt><dd>${st.loss_km2} km²</dd></div><div><dt>Clear on both</dt><dd>${st.valid_pct_both}%</dd></div></dl>`}
+        <span class="legend"><i class="g"></i>${esc(st.gain_label)}${st.loss_label ? `<i class="l"></i>${esc(st.loss_label)}` : ''}</span></div>
+      <div class="thumbs">
+        ${thumb('before', `url('${esc(a.layers.rgb_before)}')`, 'Before')}
+        ${thumb('after', `url('${esc(a.layers.rgb_after)}')`, 'After')}
+        ${thumb('change', `url('${esc(a.layers.change)}'),url('${esc(a.layers.rgb_after)}')`, 'Change')}
+      </div>
       <div data-say-anchor></div>`;
   }
 
@@ -336,35 +357,28 @@
     el.addEventListener('dblclick', () => lightbox(a, 'after'));
     const root = el.parentElement;
     root.querySelector('[data-chg]').addEventListener('change', e => { el.classList.toggle('nochg', !e.target.checked); Globe.setLayer('change', e.target.checked); $$('[data-layer=change]')[0].checked = e.target.checked; });
-    root.querySelector('[data-lb]').addEventListener('click', () => lightbox(a, 'after'));
+    root.querySelectorAll('.thumbs [data-lb]').forEach(t => t.addEventListener('click', () => lightbox(a, t.dataset.lb)));
   }
 
   const notesHtml = notes => (notes || []).map(n => `<div class="note" dir="auto">${esc(n)}</div>`).join('');
-  const actionsHtml = next => next && next.length ? `<div class="actions">${next.map(c => `<button class="act" data-next='${esc(JSON.stringify(c))}'>${esc(c.label)}${icon('i-arrow')}</button>`).join('')}</div>` : '';
+  const actionsHtml = next => next && next.length ? `<div class="actions"><div class="eyebrow">Next comparison</div>${next.map(c => `<button class="act" data-next='${esc(JSON.stringify(c))}'>${esc(c.label)}${icon('i-arrow')}</button>`).join('')}</div>` : '';
 
-  function reportRestHtml(c, a) {
-    const st = a.stats, q = a.quality, b = a.scene_before, f = a.scene_after, ctx = c.context;
-    const [iname] = INDEX[a.index] || [a.index];
+  function measuredHtml(c) {
+    return `<p class="measured" dir="auto">${esc(c.measured)}</p>${c.quality ? `<p class="qtext" dir="auto">${esc(c.quality.text)}</p>` : ''}${notesHtml(c.notes)}`;
+  }
+
+  function reportRestHtml(c) {
+    const ctx = c.context;
     const srcs = [], cite = (title, url) => { let i = srcs.findIndex(s => s.url === url); if (i < 0) { srcs.push({ title, url }); i = srcs.length - 1; } return `<a class="cite" href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(title)}">[${i + 1}]</a>`; };
-    let h = `<p class="measured" dir="auto"><span class="eyebrow">Measured · ${esc(iname)}</span><br>${esc(c.measured)}</p>${notesHtml(c.notes)}`;
-    if (c.interpretation) h += `<div class="sect"><h4>What it might mean · AI hypothesis</h4><p class="ai" dir="auto">${esc(c.interpretation.text)}</p></div>`;
-    if (ctx) {
-      if ((ctx.what_happened || []).length) h += `<div class="sect"><h4>What happened · named sources</h4><ul class="ctx-list">${ctx.what_happened.map(x => `<li dir="auto">${esc(x.text)}${cite(x.source_title, x.source_url)}</li>`).join('')}</ul></div>`;
-      if ((ctx.downsides || []).length) h += `<div class="sect"><h4>Reported downsides · not measured by satellite</h4><ul class="ctx-list">${ctx.downsides.map(x => `<li dir="auto">${esc(x.text)}${cite(x.source_title, x.source_url)}${x.disputed ? `<span class="tag-d">Disputed by developer</span>${x.disputed_note ? `<span class="dispute">${esc(x.disputed_note.replace(/^Disputed by developer:\s*/i, ''))}</span>` : ''}` : ''}</li>`).join('')}</ul></div>`;
-      if ((ctx.counterpoints || []).length) h += `<div class="sect"><h4>Counterpoints · developer and scientist statements</h4><ul class="ctx-list">${ctx.counterpoints.map(x => `<li dir="auto">${esc(x.text)}${cite(x.source_title, x.source_url)}</li>`).join('')}</ul></div>`;
+    let h = '';
+    if (c.interpretation) h += `<div class="sect"><h4>Field summary · AI hypothesis</h4><p class="ai" dir="auto">${esc(c.interpretation.text)}</p></div>`;
+    if (ctx && ((ctx.what_happened || []).length || (ctx.downsides || []).length || (ctx.counterpoints || []).length)) {
+      h += `<div class="sect"><h4>From named sources, not measured by satellite</h4>`;
+      if ((ctx.what_happened || []).length) h += `<div class="eyebrow sub-h">What happened</div><ul class="ctx-list">${ctx.what_happened.map(x => `<li dir="auto">${esc(x.text)}${cite(x.source_title, x.source_url)}</li>`).join('')}</ul>`;
+      if ((ctx.downsides || []).length) h += `<div class="eyebrow sub-h">Reported environmental impacts</div><ul class="ctx-list">${ctx.downsides.map(x => `<li dir="auto">${esc(x.text)}${cite(x.source_title, x.source_url)}${x.disputed ? `<span class="tag-d">Disputed by developer</span>${x.disputed_note ? `<span class="dispute">${esc(x.disputed_note.replace(/^Disputed by developer:\s*/i, ''))}</span>` : ''}` : ''}</li>`).join('')}</ul>`;
+      if ((ctx.counterpoints || []).length) h += `<div class="eyebrow sub-h">Counterpoints · developer and scientist statements</div><ul class="ctx-list">${ctx.counterpoints.map(x => `<li dir="auto">${esc(x.text)}${cite(x.source_title, x.source_url)}</li>`).join('')}</ul>`;
+      h += `<ol class="sources">${srcs.map(s => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a></li>`).join('')}</ol></div>`;
     }
-    const qc = c.quality || {};
-    const res = [...new Set([b, f].map(s => `${s.resolution_m} m (${s.sensor === 'landsat' ? 'Landsat' : 'Sentinel-2'})`))].join(' and ');
-    h += `<div class="sect"><h4>Evidence quality</h4><div class="quality" dir="auto">
-      <div class="row"><span class="badge ${esc(q.confidence)}">Data confidence: ${esc(q.confidence)}</span>
-        <span><span class="why" tabindex="0" title="${esc(whyText(b))}">Why this scene?</span> · <span class="why" tabindex="0" title="${esc(whyText(f))}">and this one?</span></span></div>
-      <div class="vbar" title="Share of the area measurable on both dates"><i style="width:${Math.max(0, Math.min(100, st.valid_pct_both))}%"></i></div>
-      <div class="when">${st.valid_pct_both}% clear on both dates · before ${st.valid_pct_before}% · after ${st.valid_pct_after}%<br>${esc(caption(b))} → ${esc(caption(f))}</div>
-      <p class="qtext">${esc(qc.text || '')}</p>
-      <div class="chips">${(qc.flags || []).map(x => `<span class="qchip">${esc(x)}</span>`).join('')}
-        ${st.ignored_small_km2 > 0 && !q.headline_hidden ? `<span class="qchip">Changes under ${st.min_mapping_unit_px} px ignored: ${st.ignored_small_km2} km²</span>` : ''}
-        <span class="qchip">Analysis ${esc(res)} · basemap not analysed</span></div></div></div>`;
-    if (srcs.length) h += `<div class="sect"><h4>Sources</h4><ol class="sources">${srcs.map(s => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a></li>`).join('')}</ol></div>`;
     return h + actionsHtml(c.next);
   }
 
@@ -467,6 +481,64 @@
   }
   document.addEventListener('click', e => { const c = e.target.closest('[data-close]'); if (c) c.closest('dialog').close(); });
 
+  // ------------------------------------------------------------ selector bar: region, two observation dates, index
+  // Two-way: changing a selector runs the comparison; any analysis shown (story, chip, typed question) updates the selectors.
+  const SEL = { region: $('#sel-region'), y1: $('#sel-y1'), y2: $('#sel-y2'), index: $('#sel-index'), run: $('#sel-run') };
+  const IDX_LABEL = { mndwi: 'MNDWI · water, coast', ndvi: 'NDVI · vegetation', ndwi: 'NDWI · surface water', flood: 'MNDWI flood rule', nbr: 'dNBR · burn scar' };
+  const DEFAULT_PAIR = { palm_jumeirah: ['2001', '2008'] };
+  const banks = {}, singles = {};
+  const shortSensor = p => sensorName(p).replace(/ (TM|ETM\+|OLI(-2)?)$/, '');
+  const regionName = pid => ((presets.find(p => p.id === pid) || {}).title || pid).replace(/ reclamation$/, '');
+
+  async function fillRegion(pid, y1, y2, ix) {
+    SEL.region.value = pid;
+    const frames = (cfg.frames || {})[pid];
+    if (frames && frames.length) {
+      const rows = banks[pid] || (banks[pid] = await api(`/api/frames/${pid}`));
+      const opts = rows.map(r => `<option value="${esc(r.year)}">${esc(r.year)} · ${esc(fmtDate(r.day).replace(/^\d+ /, ''))} · ${esc(shortSensor(r.platform))}</option>`).join('');
+      const [d1, d2] = DEFAULT_PAIR[pid] || [rows[0].year, rows[rows.length - 1].year];
+      SEL.y1.innerHTML = opts; SEL.y2.innerHTML = opts;
+      SEL.y1.value = y1 || d1; SEL.y2.value = y2 || d2;
+      SEL.index.innerHTML = ['mndwi', 'ndvi', 'ndwi'].map(k => `<option value="${k}">${IDX_LABEL[k]}</option>`).join('');
+      SEL.index.value = ix && IDX_LABEL[ix] ? ix : 'mndwi';
+      [SEL.y1, SEL.y2, SEL.index].forEach(s => { s.disabled = false; });
+    } else {                                                       // single-pair story: its two dates and index are fixed
+      const a = singles[pid] || (singles[pid] = await api(`/api/presets/${pid}`));
+      SEL.y1.innerHTML = `<option>${esc(fmtDate(a.scene_before.day))} · ${esc(shortSensor(a.scene_before.platform))}</option>`;
+      SEL.y2.innerHTML = `<option>${esc(fmtDate(a.scene_after.day))} · ${esc(shortSensor(a.scene_after.platform))}</option>`;
+      SEL.index.innerHTML = `<option value="${esc(a.index)}">${esc(IDX_LABEL[a.index] || a.index)}</option>`;
+      [SEL.y1, SEL.y2, SEL.index].forEach(s => { s.disabled = true; });
+    }
+    SEL.run.disabled = !SEL.y1.disabled && SEL.y1.value === SEL.y2.value;
+  }
+
+  async function initSelectors() {
+    const frames = cfg.frames || {};
+    const ready = presets.filter(p => p.cached || (frames[p.id] || []).length);
+    SEL.region.innerHTML = ready.map(p => `<option value="${esc(p.id)}">${esc(p.title)}</option>`).join('');
+    if (ready.length) await fillRegion(ready.some(p => p.id === 'palm_jumeirah') ? 'palm_jumeirah' : ready[0].id).catch(() => {});
+  }
+
+  function runSelectors() {
+    const pid = SEL.region.value;
+    if (!pid) return;
+    if (!SEL.y1.disabled) {
+      const ys = [SEL.y1.value, SEL.y2.value].sort();
+      if (ys[0] === ys[1]) { SEL.run.disabled = true; return; }
+      ask(`Compare ${regionName(pid)} ${ys[0]} to ${ys[1]}`, pid, null, { index: SEL.index.value });
+    } else ask(STORY_MSG[pid] || regionName(pid), pid);
+  }
+
+  function syncSelectors(a) {
+    const m = /^presets:([a-z0-9_]+?)(?:__(\d{4})_(\d{4})(?:_([a-z]+))?)?$/.exec(a.analysis_id || '');
+    if (!m || ![...SEL.region.options].some(o => o.value === m[1])) return;
+    fillRegion(m[1], m[2], m[3], m[4] || a.index).catch(() => {});
+  }
+
+  SEL.region.addEventListener('change', () => fillRegion(SEL.region.value).then(runSelectors).catch(() => {}));
+  [SEL.y1, SEL.y2, SEL.index].forEach(s => s.addEventListener('change', () => { SEL.run.disabled = SEL.y1.value === SEL.y2.value; runSelectors(); }));
+  $('#instr').addEventListener('submit', e => { e.preventDefault(); runSelectors(); });
+
   // ------------------------------------------------------------ chrome controls
   function setSeg(mode) { $$('[data-compare]').forEach(b => { const on = b.dataset.compare === mode; b.classList.toggle('active', on); b.setAttribute('aria-pressed', on); }); }
   $$('[data-compare]').forEach(b => b.onclick = () => { setSeg(b.dataset.compare); Globe.setCompare(b.dataset.compare); });
@@ -492,18 +564,23 @@
   }
   $('#btnSats').onclick = () => sats($('#btnSats').getAttribute('aria-pressed') !== 'true');
   $('#optSats').onchange = e => { if ((e.target.checked) !== ($('#btnSats').getAttribute('aria-pressed') === 'true')) sats(e.target.checked); };
+  // The chat slides over the globe with a CSS transform; the canvas keeps its size, so we only repaint once, at the end.
+  const chatEl = $('#chat'), narrow = () => matchMedia('(max-width: 900px)').matches;
+  const syncInset = () => Globe.setInset(!narrow() && !app.classList.contains('chat-closed') ? chatEl.offsetWidth : 0);
+  let slideT;
+  const settle = () => { clearTimeout(slideT); slideT = null; syncInset(); Globe.resize(); };
   const toggleChat = force => {
-    const closed = force === true ? app.classList.remove('chat-closed') : app.classList.toggle('chat-closed');
+    if (force === true) app.classList.remove('chat-closed'); else app.classList.toggle('chat-closed');
     $('#btnChat').setAttribute('aria-pressed', !app.classList.contains('chat-closed'));
-    setTimeout(() => Globe.resize(), 280);
-    return closed;
+    clearTimeout(slideT); slideT = setTimeout(settle, 250);           // fallback if transitionend never fires (reduced motion)
   };
+  chatEl.addEventListener('transitionend', e => { if (e.target === chatEl && e.propertyName === 'transform' && slideT) settle(); });
   $('#btnChat').onclick = () => toggleChat();
   $('#chatClose').onclick = () => toggleChat();
-  app.addEventListener('transitionend', e => { if (e.target === app) Globe.resize(); });
   let rz;
-  addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => Globe.resize(), 120); });
-  if (matchMedia('(max-width: 900px)').matches) { app.classList.add('chat-closed'); $('#btnChat').setAttribute('aria-pressed', false); }
+  addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { syncInset(); Globe.resize(); }, 120); });
+  if (narrow()) { app.classList.add('chat-closed'); $('#btnChat').setAttribute('aria-pressed', false); }
+  syncInset();
   $('#btnHelp').onclick = () => $('#help').showModal();
   const openDrawer = v => { $('#drawer').hidden = !v; $('#navSaved').setAttribute('aria-expanded', v); };
   $('#navSaved').onclick = () => openDrawer($('#drawer').hidden);

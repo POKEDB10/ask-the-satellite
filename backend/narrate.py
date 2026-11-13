@@ -69,7 +69,12 @@ DISK_MAX = 200
 
 def _persistable(key):
     """Only story narrations go to disk: keys built from server-side preset analyses, a small fixed set."""
+    if len(key) == 5 and key[0] == "place":                          # recorded briefs for a fixed list of demo places only
+        return key[1] in PERSIST_PLACES
     return len(key) == 3 and key[0] == "change" and str(key[1]).startswith("presets:") and len(str(key[1])) < 80
+
+
+PERSIST_PLACES = {"dubai", "kyoto", "palm jumeirah", "burj khalifa", "lake mead", "aral sea"}
 
 
 def _disk_put(key, sentences, model):
@@ -122,6 +127,13 @@ def stream(system, facts, key, max_tokens=260):
         ev.set()
 
 
+MAX_SENTENCES, MAX_WORDS = 3, 65
+
+
+def _room(out, s):
+    return len(out) < MAX_SENTENCES and sum(len(x.split()) for x in out) + len(s.split()) <= MAX_WORDS
+
+
 def _generate(system, facts, key, max_tokens):
     if not agent.MODELS or not ops.LLM_GATE.try_enter(wait=2.5):     # busy: skip the narrative, the cards still answer
         return
@@ -141,14 +153,14 @@ def _generate(system, facts, key, max_tokens):
                 parts = SPLIT.split(buf)
                 for s in parts[:-1]:
                     s = _scrub(_clean(s))
-                    if _ok(s, facts):
+                    if _ok(s, facts) and _room(out, s):
                         out.append(s)
                         yield s
                 buf = parts[-1]
-                if j.get("done"):
+                if j.get("done") or len(out) >= MAX_SENTENCES:
                     break
             s = _scrub(_clean(buf))
-            if _ok(s, facts):
+            if len(out) < MAX_SENTENCES and _ok(s, facts) and _room(out, s):
                 out.append(s)
                 yield s
     except Exception:
@@ -167,9 +179,10 @@ def _generate(system, facts, key, max_tokens):
 
 
 def place_prompt(name, lang):
-    return (f"You are a friendly local guide inside a satellite-imagery app. Using ONLY the FACTS (from Wikipedia), write 3 to 5 "
-            f"short sentences in {LANG.get(lang, 'English')} about {name}: what it is, what it is known for, and two or three nearby "
-            "places worth a stop. Do not invent anything that is not in FACTS. Do not write any number that is not in FACTS. "
+    return (f"You write an Earth observation field brief for {name}, in {LANG.get(lang, 'English')}, inside a satellite-imagery "
+            "app. Using ONLY the FACTS (from Wikipedia), write 2 or 3 factual sentences, at most 60 words, on what a satellite would "
+            "see: terrain, urban footprint, coastline or water bodies, and environmental context. No tourist advice, no sightseeing "
+            "tips, no opinions, no filler. Do not invent anything that is not in FACTS. Do not write any number that is not in FACTS. "
             "No lists, no headings, no markdown.")
 
 
@@ -184,16 +197,18 @@ def place_facts(name, w):
 
 
 def change_prompt(lang):
-    return (f"You narrate a satellite change measurement for a general audience, in {LANG.get(lang, 'English')}. Write 3 to 5 short "
-            "sentences. 1) Say what the satellite measured between the two dates (from MEASURED). 2) Say what the named sources report "
-            "happened, and name the source in the same sentence exactly as written on its SOURCE line (for example 'According to The "
-            "National, ...'). Never credit a claim to a different source. 3) One sentence on what it could mean, including reported "
-            "downsides, marked as reported. If a NOTE says the window predates the work, say the images show the coast before the work "
+    return (f"You write a field summary of a satellite change measurement, in {LANG.get(lang, 'English')}. Exactly 3 crisp factual "
+            "sentences, at most 60 words in total, no conversational filler. 1) The physical change measured between the two dates, with "
+            "the sensors (from MEASURED). 2) What the named sources report happened, naming the source exactly as written on its SOURCE "
+            "line (for example 'According to The National, ...'). Never credit a claim to a different source. 3) The primary "
+            "environmental implication reported by the sources, marked as reported. If a NOTE says the window predates the work, say the images show the coast before the work "
             "began, so little change is expected. Use cautious wording for causes. Do not write any number that is not in the text below. "
             "No lists, no headings, no markdown.")
 
 
 def change_facts(a, ctx, notes, measured):
+    # net change only: with the gross gain/loss in view the 7B said "shrank by" the gross loss (18.8 vs net 18.4 km2)
+    measured = re.sub(r"\s*Gained [\d.,]+ km², lost [\d.,]+ km²\.?", "", measured)
     lines = [f"MEASURED (shown on screen): {measured}",
              f"DATA QUALITY: {a['stats']['valid_pct_both']:.0f} percent of the area was clear on both dates; confidence {a['quality']['confidence']}."]
     if ctx:

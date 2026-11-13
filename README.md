@@ -58,6 +58,7 @@ The repository includes a `Dockerfile` and a Render Blueprint (`render.yaml`). T
 - **Stories cost almost nothing.** Pre-computed analyses, frame comparisons and narrations are served from disk and memory: a shared narration file, an in-memory cache for PNG and JSON with ETag/304, and Cache-Control on static assets.
 - **No duplicate work.** Many people asking the same thing at once trigger one model call, one Wikipedia lookup and one geocode; the rest wait for it and replay.
 - **Expensive paths are gated.** One live raster job at a time (queue of 3, then a friendly "busy" card). One model call at a time; if the model is busy for more than 2.5 s, the answer goes out without the story. A 400-thread pool means streaming answers never starve static files.
+- **Small-container RAM guard.** On Render, or with no model, the in-memory file cache holds at most 24 MB and skips files over 1.5 MB. The 4–6 MB story PNGs stream from disk and browsers cache them.
 - **Per-visitor rate limits.** Chat 20 burst then 40 a minute; search 30 burst then 4 a second. These answer with a friendly card or HTTP 429, never a stack trace. Limits are per worker process.
 - **Measured** (`tests/load_test.py`, this laptop, 4 workers, 3,000 visitors arriving 160 at a time, 7 requests each including a full streamed story answer):
   - 21,000 requests in 36.8 s (571 requests/s), **0 errors**.
@@ -68,7 +69,7 @@ The repository includes a `Dockerfile` and a Render Blueprint (`render.yaml`). T
 
 ## What is measured, and how
 
-- **Indices:** MNDWI for water (threshold 0), NDVI for vegetation (0.3), an MNDWI flood rule, and dNBR for burns. Change is a class flip between two dates on one EPSG:3857 grid. Area is corrected by cos²(latitude). Blobs under 5 pixels are dropped and reported.
+- **Indices:** MNDWI for water (threshold 0), NDWI (McFeeters, green vs NIR, threshold 0; frame bank only), NDVI for vegetation (0.3), an MNDWI flood rule, and dNBR for burns. Change is a class flip between two dates on one EPSG:3857 grid. Area is corrected by cos²(latitude). Blobs under 5 pixels are dropped and reported.
 - **Masks:** Sentinel-2 SCL 0, 1, 3, 8, 9, 10 and Landsat QA_PIXEL bits 0–4. Landsat 7 stripe gaps count as no data. Unreadable pixels are grey hatching, never "no change".
 - **Confidence:**
   - HIGH: at least 85% valid on both dates.
@@ -83,6 +84,18 @@ The repository includes a `Dockerfile` and a Render Blueprint (`render.yaml`). T
 
 ## The assistant
 
+- **Date and index selector bar** (top of the assistant): Region, Date 1 (before), Date 2 (after), Index (MNDWI, NDVI, NDWI).
+  - Changing any of them runs the comparison, flies the globe and redraws the report.
+  - Any analysis opened by chat, story or chip updates the selectors.
+  - Palm Jumeirah offers every year in its frame bank (2000, 2001, 2003, 2008, Jan 2018, Jan 2024). The single-pair stories (Lake Mead, UAE flood, Palm Jebel Ali, Aral Sea) show their fixed dates and index.
+- **Report order:**
+  1. Telemetry banner: net km² and %, dates, sensors, grid, confidence, valid pixels.
+  2. Before/after swipe and Before/After/Change thumbnails.
+  3. Field summary: at most 3 sentences and 65 words.
+  4. Named sources, with [n] citations and "Disputed by developer" tags.
+  5. Next comparisons.
+- **Explore mode is an Earth observation brief** (terrain, urban footprint, coastline, water). Geographic features come first; restaurants, hotels and retail are filtered out. Every place card ends with one-click comparison chips.
+- **Arabic questions** get the hand-written Arabic measured and quality cards, but no AI narration: the names guard cannot check Arabic script.
 - **Two modes, chosen by rules.** A change question (years, compare, before/after, flood, shrink, and the like) gets a measurement. Anything else that names a place gets the explore card.
 - **Planner.** The rule router answers first (0 ms). The model refines the plan only when the rules are unsure, and it may not:
   - tie a different place to a story;
@@ -128,4 +141,4 @@ Still unresolved; confirm them on the day:
 - May anything change after submission?
 - What must the submission contain?
 
-Tags: `v1.0-submission` (first freeze), `v1.1` (this version).
+Tags: `v1.0-submission` (first freeze), `v1.1`, `v1.2` (this version). Offline self-checks: `.venv\Scripts\python tests\test_v12.py`.

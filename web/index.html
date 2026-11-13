@@ -58,7 +58,7 @@
         <label><input type="checkbox" data-layer="change" checked> Change <span class="key"><i class="g"></i>gain <i class="l"></i>loss</span></label>
         <label><input type="checkbox" data-layer="mask"> Not measured <span class="key"><i class="m"></i>cloud, no data</span></label>
         <div class="eyebrow">Globe</div>
-        <label><input type="checkbox" id="optSats"> Live satellites <span class="key">CelesTrak</span></label>
+        <label><input type="checkbox" id="optSats"> EO satellites <span class="key">CelesTrak</span></label>
         <label><input type="checkbox" id="optSpin"> Spin when idle</label>
         <label><input type="checkbox" data-layer="labels"> Place labels</label>
         <div class="eyebrow">Basemap · context only, never analysed</div>
@@ -93,7 +93,7 @@
     <div class="hint" id="hint">Drag to rotate · Scroll to zoom · Search or ask to fly anywhere</div>
     <div class="chip hud" id="hud"><span id="hudCoord">—</span><span id="hudHeight">—</span><span class="scale"><i id="scaleBar"></i><span id="scaleText"></span></span></div>
     <div class="nav-chips" role="toolbar" aria-label="Globe controls">
-      <button class="chip btn" id="btnSats" aria-pressed="false" title="Live satellites"><svg class="ico"><use href="#i-sat"/></svg></button>
+      <button class="chip btn wide" id="btnSats" aria-pressed="false" title="Earth-observation satellites, live (CelesTrak)"><svg class="ico"><use href="#i-sat"/></svg><span>EO Satellites</span></button>
       <button class="chip btn" id="btnTilt" aria-pressed="false" title="Tilt (T)"><svg class="ico"><use href="#i-tilt"/></svg></button>
       <button class="chip btn" id="compass" title="North up"><svg viewBox="0 0 16 16" class="ico" id="compassNeedle"><path d="M8 1.5 10 8H6z" fill="#F85149" stroke="none"/><path d="M8 14.5 6 8h4z" fill="#A6B0C3" stroke="none"/></svg></button>
       <div class="zoom-pair"><button class="chip btn" id="zoomIn" aria-label="Zoom in"><svg class="ico"><use href="#i-plus"/></svg></button><button class="chip btn" id="zoomOut" aria-label="Zoom out"><svg class="ico"><use href="#i-minus"/></svg></button></div>
@@ -114,6 +114,13 @@
       <div><div class="chat-title">Assistant</div><div class="chat-sub" id="chatSub">Connecting…</div></div>
       <button class="x mobile-close" id="chatClose" aria-label="Close assistant"><svg class="ico"><use href="#i-close"/></svg></button>
     </div>
+    <form class="instr" id="instr" role="group" aria-label="Compare two observation periods">
+      <label class="f reg"><span>Region</span><select id="sel-region" aria-label="Region"></select></label>
+      <label class="f ix"><span>Index</span><select id="sel-index" aria-label="Spectral index"></select></label>
+      <label class="f"><span>Date 1 · before</span><select id="sel-y1" aria-label="Before date"></select></label>
+      <label class="f"><span>Date 2 · after</span><select id="sel-y2" aria-label="After date"></select></label>
+      <button class="run" id="sel-run" type="submit">Run</button>
+    </form>
     <div class="log" id="log" aria-live="polite">
       <div class="empty" id="empty">
         <h2>What's changing here?</h2>

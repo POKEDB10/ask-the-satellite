@@ -2,6 +2,8 @@
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /app
+# rasterio's bundled GDAL links against libexpat, which python:*-slim does not ship (ImportError: libexpat.so.1)
+RUN apt-get update && apt-get install -y --no-install-recommends libexpat1 && rm -rf /var/lib/apt/lists/*
 COPY requirements.lock.txt .
 RUN pip install -r requirements.lock.txt
 COPY backend backend

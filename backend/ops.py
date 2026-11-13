@@ -86,8 +86,10 @@ class CacheHeaders:
 
 # ------------------------------------------------------------------ satellites: CelesTrak TLEs, cached on disk (offline keeps the last copy)
 TLE_DIR = ROOT / "cache" / "tle"
-GROUPS = ("resource", "stations")                                  # Earth-observation satellites + space stations
-HIGHLIGHT = ("LANDSAT 8", "LANDSAT 9", "SENTINEL-2A", "SENTINEL-2B", "SENTINEL-2C", "ISS (ZARYA)")
+GROUPS = ("resource", "weather", "stations")                       # Earth resources, weather (Suomi NPP, NOAA-20/21), stations
+# primary Earth-observation missions (prefix match: CelesTrak appends suffixes such as "NOAA 20 (JPSS-1)")
+HIGHLIGHT = ("LANDSAT 7", "LANDSAT 8", "LANDSAT 9", "SENTINEL-2A", "SENTINEL-2B", "SENTINEL-2C", "SENTINEL-1A", "SENTINEL-3A",
+             "SENTINEL-3B", "TERRA", "AQUA", "SUOMI NPP", "NOAA 20", "NOAA 21")
 _tle_lock = threading.Lock()
 
 
@@ -97,7 +99,7 @@ def _parse(text):
     for i in range(0, len(lines) - 2, 3):
         n, a, b = lines[i:i + 3]
         if a.startswith("1 ") and b.startswith("2 "):
-            out.append(dict(name=n.strip(), l1=a, l2=b, norad=a[2:7].strip(), key=n.strip() in HIGHLIGHT))
+            out.append(dict(name=n.strip(), l1=a, l2=b, norad=a[2:7].strip(), key=any(n.strip() == h or n.strip().startswith(h + " ") for h in HIGHLIGHT)))
     return out
 
 
@@ -133,8 +135,14 @@ class MemoryStatic:
     Anything else, or anything not found, falls through to the normal StaticFiles mount."""
     TYPES = {".png": b"image/png", ".json": b"application/json", ".jpg": b"image/jpeg"}
 
-    def __init__(self, app, root, max_bytes=16_000_000, max_files=400):
-        self.app, self.root, self.max_bytes, self.max_files = app, pathlib.Path(root).resolve(), max_bytes, max_files
+    # Production (Render free plan, 512 MB): at most 24 MB in RAM and nothing over 1.5 MB (4-6 MB story PNGs stream from disk
+    # and browsers cache them via Cache-Control). On the stage laptop the per-file cap is 16 MB.
+    PROD = bool(os.getenv("RENDER")) or os.getenv("LLM_MODEL", "x") == ""
+
+    def __init__(self, app, root, max_bytes=None, max_total=24_000_000):
+        self.app, self.root = app, pathlib.Path(root).resolve()
+        self.max_bytes = max_bytes or (1_500_000 if self.PROD else 16_000_000)
+        self.max_total, self.total = max_total, 0
         self.files, self.lock = {}, threading.Lock()
 
     def _load(self, rel):
@@ -150,9 +158,12 @@ class MemoryStatic:
         data = p.read_bytes()
         hit = (stt.st_mtime_ns, data, f'"{stt.st_mtime_ns:x}-{len(data):x}"'.encode(), self.TYPES[p.suffix])
         with self.lock:
-            if len(self.files) >= self.max_files:
-                self.files.pop(next(iter(self.files)))
+            old = self.files.pop(p, None)
+            self.total -= len(old[1]) if old else 0
+            while self.files and self.total + len(data) > self.max_total:   # FIFO eviction under the byte budget
+                self.total -= len(self.files.pop(next(iter(self.files)))[1])
             self.files[p] = hit
+            self.total += len(data)
         return hit
 
     async def __call__(self, scope, receive, send):

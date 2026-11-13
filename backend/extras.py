@@ -23,7 +23,8 @@ def _warm():
 
 PREWARM = [("Compare the Palm Jumeirah reclamation between 2000 and 2001", None), ("Palm Jumeirah 2001 to 2008", "palm_jumeirah"),
            ("Palm Jumeirah 2001 to 2024", None), ("Did Lake Mead shrink?", None), ("UAE flood April 2024", None),
-           ("Show Palm Jebel Ali", "palm_jebel_ali"), ("أظهر لي جزيرة نخلة جميرا قبل وبعد", None)]
+           ("Show Palm Jebel Ali", "palm_jebel_ali"), ("Did the Aral Sea shrink?", "aral_sea"), ("Dubai", None), ("Kyoto", None),
+           ("Burj Khalifa", None), ("Palm Jumeirah", None), ("أظهر لي جزيرة نخلة جميرا قبل وبعد", None)]
 
 
 def _prewarm():
@@ -76,7 +77,7 @@ def with_context(a, pid):
 def compare(pid, y1, y2, index="mndwi"):
     """Change between two cached frames, through the unchanged change.run_change."""
     bank = frame_years(pid)
-    if y1 not in bank or y2 not in bank or index not in ("mndwi", "ndvi") or y1 == y2:
+    if y1 not in bank or y2 not in bank or index not in ("mndwi", "ndvi", "ndwi") or y1 == y2:
         raise ValueError(f"years must be two different values from {bank}")
     rel = f"presets/{pid}__{y1}_{y2}" + ("" if index == "mndwi" else f"_{index}")
     out = CACHE / rel
@@ -194,14 +195,14 @@ def _nearest_preset(center):
     return min(ready, key=dist) if ready else None
 
 
-def _preset_analysis(pid, ys, notes):
+def _preset_analysis(pid, ys, notes, index="mndwi"):
     """Year handling: the bank decides. Returns an Analysis, or None after adding a note listing what exists."""
     bank = frame_years(pid)
     if bank:
         if len(ys) >= 2:
             y1, y2 = ys[0], ys[-1]
             if y1 in bank and y2 in bank:
-                return compare(pid, y1, y2)
+                return compare(pid, y1, y2, index)
             missing = [y for y in (y1, y2) if y not in bank]
             notes.append(f"No cached frame for {', '.join(missing)}. Years available: {', '.join(bank)}.")
             return None
@@ -217,13 +218,19 @@ def _next_chips(pid, a):
     return [c for c in chips if c.get("label") and not (a and c.get("years") == [a["scene_before"]["day"][:4], a["scene_after"]["day"][:4]])]
 
 
+EO_CHIPS = [dict(label="Compare Palm Jumeirah 2001 → 2008 (MNDWI)", message="Compare Palm Jumeirah 2001 to 2008", preset_id="palm_jumeirah"),
+            dict(label="Compare Palm Jumeirah 2000 → 2001", message="Compare Palm Jumeirah 2000 to 2001", preset_id="palm_jumeirah"),
+            dict(label="UAE Flood April 2024 Analysis", message="UAE flood, April 2024", preset_id="dubai_flood_2024"),
+            dict(label="Did Lake Mead shrink?", message="Did Lake Mead shrink?")]
+
+
 def _place_chips(name, pid):
     chips = []
-    if pid:
+    if pid and pid != "palm_jumeirah":
         chips.append(dict(label=f"Watch it change: {presets.PRESETS[pid]['title']}", message=presets.PRESETS[pid]["title"] + " before and after", preset_id=pid))
     if ops.ALLOW_LIVE:
         chips.append(dict(label="Measure change here, 2019 to now", message=f"How has {name} changed since 2019?"))
-    return chips
+    return chips + EO_CHIPS                                       # one click from any place into satellite change detection
 
 
 _geo_cache = place.TTLCache(24 * 3600)
@@ -277,6 +284,7 @@ def _run_live(g, p):
 
 class StreamReq(main.ChatReq):
     place_hint: dict | None = None                                 # {name, center:[lon,lat], bbox:[w,s,e,n]} from /api/search
+    index: str | None = None                                       # selector bar: mndwi | ndvi | ndwi for the frame bank
 
 
 def _stream(req):
@@ -355,7 +363,7 @@ def _stream(req):
         yield _ev("place", dict(name=label, full=g["name"], center=g["center"], bbox=g["bbox"], wiki=w, preset_id=p.preset_id,
                                 attribution="Wikipedia (CC BY-SA 4.0) · OpenStreetMap contributors (ODbL)"))
         yield _ev("progress", dict(step="scenes", state="done", label="Read"))
-        if w and narrate.available(pkey):
+        if w and narrate.available(pkey) and lang == "en":
             for s in narrate.stream(narrate.place_prompt(main_title, lang), narrate.place_facts(main_title, w), pkey):
                 yield _ev("say", dict(text=s, source=_narrator(pkey)))
         yield _ev("cards", dict(kind="place", next=_place_chips(label, p.preset_id)))
@@ -365,7 +373,7 @@ def _stream(req):
     # ---------------- change: preset bank or live Sentinel-2
     yield _ev("progress", dict(step="scenes", state="active", label="Picking scenes"))
     if pr:
-        a = _preset_analysis(p.preset_id, ys, notes)
+        a = _preset_analysis(p.preset_id, ys, notes, req.index if req.index in ("mndwi", "ndvi", "ndwi") else "mndwi")
         if a is None:
             yield _ev("cards", dict(measured=notes[-1], kind="info", next=_next_chips(p.preset_id, None)))
             return
@@ -393,7 +401,8 @@ def _stream(req):
                  context=a.get("context"), next=_next_chips(p.preset_id, a), interpretation=None)
     told = False
     nkey = ("change", a["analysis_id"], lang)
-    if narrate.available(nkey) and not a["quality"]["headline_hidden"]:
+    # Arabic gets the hand-written Arabic cards only: the names guard cannot check Arabic script
+    if narrate.available(nkey) and not a["quality"]["headline_hidden"] and lang == "en":
         ctx_line = pr["context"] if pr else ""
         facts = narrate.change_facts(a, a.get("context"), notes + ([ctx_line] if ctx_line and not a.get("context") else []), cards["measured"])
         for s in narrate.stream(narrate.change_prompt(lang), facts, nkey):

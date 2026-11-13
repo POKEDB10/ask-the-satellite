@@ -136,7 +136,8 @@ def plan(q, has_last=False):
 
 # ----------------------------------------------------------------- deterministic cards
 NOUN = {"mndwi": ("water area", "مساحة المياه"), "flood": ("flooded area", "المساحة المغمورة"),
-        "ndvi": ("vegetated area", "مساحة الغطاء النباتي"), "nbr": ("burned area", "المساحة المحترقة")}
+        "ndvi": ("vegetated area", "مساحة الغطاء النباتي"), "nbr": ("burned area", "المساحة المحترقة"),
+        "ndwi": ("surface water area", "مساحة المياه السطحية")}
 FLAG = {"cross_sensor": ("Different satellites: resolution and bands differ", "أقمار مختلفة: الدقة والنطاقات تختلف"),
         "season_mismatch": ("Dates are more than 45 days apart in the season", "فارق موسمي يتجاوز 45 يوماً"),
         "landsat7_slc_gaps": ("Landsat 7 stripe gaps are treated as no data", "فجوات لاندسات 7 تُعد بيانات مفقودة"),
