@@ -231,6 +231,7 @@
       await sse('/api/chat/stream', { message, preset_id, last_analysis_id: last && last.analysis_id, place_hint: hint, index: opts.index || null }, async (ev, d) => {
         if (me !== current) return;
         if (ev === 'plan') {
+          if (!d.plan.preset_id) showInstr(false);                   // not a story: the dates bar has nothing to show
           if (d.fly_to && d.fly_to.join() !== flownKey) {
             flownKey = d.fly_to.join();
             const f = Globe.flyTo(d.fly_to); flight = { ...f, start: performance.now() };
@@ -242,7 +243,6 @@
           lbl.textContent = d.label;
         } else if (ev === 'place') {
           place = d;
-          autoInstr(false);
           if (Globe.state.analysis) Globe.hideAnalysis();
           body.insertAdjacentHTML('beforeend', placeHtml(d));
           pinTop();
@@ -533,20 +533,14 @@
     } else ask(STORY_MSG[pid] || regionName(pid), pid);
   }
 
-  // The bar starts closed. It opens by itself only for pre-computed (story) analyses, and closes again for anything else
-  // unless the user opened it themselves.
-  let instrMine = false;
-  function showInstr(v, mine = false) {
-    $('#instr').hidden = !v; $('#instrToggle').setAttribute('aria-expanded', v);
-    instrMine = v && mine;
-  }
-  $('#instrToggle').onclick = () => showInstr($('#instr').hidden, true);
-  const autoInstr = pre => { if (pre) showInstr(true, instrMine); else if (!instrMine) showInstr(false); };
+  // The bar starts closed. It opens by itself for pre-computed (story) analyses and closes for any other answer.
+  function showInstr(v) { $('#instr').hidden = !v; $('#instrToggle').setAttribute('aria-expanded', v); }
+  $('#instrToggle').onclick = () => showInstr($('#instr').hidden);
 
   function syncSelectors(a) {
     const m = /^presets:([a-z0-9_]+?)(?:__(\d{4})_(\d{4})(?:_([a-z]+))?)?$/.exec(a.analysis_id || '');
     const pre = !!m && [...SEL.region.options].some(o => o.value === m[1]);
-    autoInstr(pre);
+    showInstr(pre);
     if (pre) fillRegion(m[1], m[2], m[3], m[4] || a.index).catch(() => {});
   }
 
