@@ -7,7 +7,7 @@ A Google-Earth-style globe with an evidence assistant.
 
 Every measured number comes from the change engine (`backend/change.py`). The local model only plans the question and narrates. A sentence it writes is shown only if all its numbers and proper names appear in the facts it was given.
 
-New to the project? Read the team study guide first: [docs/STUDY_GUIDE.md](docs/STUDY_GUIDE.md). Presenting? Use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
+New to the project? Read [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) (10 minutes); the lead for hard questions reads [docs/LEAD_GUIDE.md](docs/LEAD_GUIDE.md) (30 minutes). Presenting? Use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
 ## Run it (Windows)
 

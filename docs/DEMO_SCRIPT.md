@@ -2,7 +2,7 @@
 
 About 5 minutes: a short opening, four scenarios, then a close. **Bold** lines are what you do; quoted lines are what you say. Every number below is what the app shows on screen today, checked on 13 Nov 2026.
 
-Say the numbers the way the screen shows them; don't round them differently. For deeper questions afterwards, see [STUDY_GUIDE.md](STUDY_GUIDE.md).
+Say the numbers the way the screen shows them; don't round them differently. For deeper questions afterwards, see [LEAD_GUIDE.md](LEAD_GUIDE.md).
 
 ---
 
