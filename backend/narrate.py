@@ -64,9 +64,21 @@ def _disk_get(key):
     return _disk.get(_kstr(key))
 
 
+DISK_MAX = 200
+
+
+def _persistable(key):
+    """Only story narrations go to disk: keys built from server-side preset analyses, a small fixed set."""
+    return len(key) == 3 and key[0] == "change" and str(key[1]).startswith("presets:") and len(str(key[1])) < 80
+
+
 def _disk_put(key, sentences, model):
+    if not _persistable(key):
+        return
     with _clock:
         d = _disk_load()
+        while len(d) >= DISK_MAX:
+            d.pop(next(iter(d)))
         d[_kstr(key)] = {"sentences": sentences, "model": model, "at": time.strftime("%Y-%m-%d")}
         tmp = DISK.with_suffix(".tmp")
         tmp.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")

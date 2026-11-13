@@ -1,0 +1,14 @@
+# Render Blueprint: New > Blueprint > pick this repository. Free plan sleeps after 15 min idle (first visit then takes about a minute).
+services:
+  - type: web
+    name: ask-the-satellite
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/presets
+    envVars:
+      - key: ARCGIS_API_KEY        # optional; restrict it by HTTP referrer to your onrender.com URL in the ArcGIS dashboard
+        sync: false
+      - key: GEOCODE_UA            # Nominatim wants contact details: put your team email here
+        value: "AskTheSatellite-NOVA2026/1.1 (public demo)"
+      - key: WEB_CONCURRENCY
+        value: "2"

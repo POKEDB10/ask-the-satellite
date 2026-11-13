@@ -346,14 +346,18 @@ def _stream(req):
     # ---------------- explore: a place, not a change question -> reference card + guide narrative
     if not change_q:
         yield _ev("progress", dict(step="scenes", state="active", label="Reading about this place"))
-        label = (pr["title"] if pr else (p.place or g["name"]).split(",")[0]).strip()
+        label = (pr["title"] if pr else g["name"].split(",")[0] or p.place or "").strip()[:80]   # most specific part of the geocoded name
         w = place.wiki(pr["aliases"][0].title() if pr else label, g["center"])
+        main_title = ((w or {}).get("main") or {}).get("title") or label
+        if not pr and main_title.isascii() and not label.isascii():
+            label = main_title                                        # prefer the English article title for labels and chips
+        pkey = ("place", main_title.lower()[:80], round(g["center"][0], 2), round(g["center"][1], 2), lang)   # resolved place, memory only
         yield _ev("place", dict(name=label, full=g["name"], center=g["center"], bbox=g["bbox"], wiki=w, preset_id=p.preset_id,
                                 attribution="Wikipedia (CC BY-SA 4.0) · OpenStreetMap contributors (ODbL)"))
         yield _ev("progress", dict(step="scenes", state="done", label="Read"))
-        if w and narrate.available(("place", label.lower(), lang)):
-            for s in narrate.stream(narrate.place_prompt(label, lang), narrate.place_facts(label, w), ("place", label.lower(), lang)):
-                yield _ev("say", dict(text=s, source=_narrator(("place", label.lower(), lang))))
+        if w and narrate.available(pkey):
+            for s in narrate.stream(narrate.place_prompt(main_title, lang), narrate.place_facts(main_title, w), pkey):
+                yield _ev("say", dict(text=s, source=_narrator(pkey)))
         yield _ev("cards", dict(kind="place", next=_place_chips(label, p.preset_id)))
         yield _ev("done", dict(elapsed_s=round(time.time() - t0, 1)))
         return

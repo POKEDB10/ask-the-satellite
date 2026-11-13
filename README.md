@@ -1,8 +1,11 @@
 # Ask the Satellite (NOVA 2026, Track D)
 
-Ask a question about a place and a time. The globe flies there and shows real before and after satellite imagery with a swipe. The chat answers with measured change, data quality and sourced context.
+A Google-Earth-style globe with an evidence assistant.
 
-Every number comes from the change engine (`backend/change.py`). The local language model only plans the question and words the reply. A number guard rejects any figure the model did not receive.
+- **Name a place** and the globe zooms out to orbit, turns, and zooms in. The assistant shows a place card from Wikipedia with nearby highlights, and a short guide written by a local model.
+- **Ask how a place changed** ("compare Palm Jumeirah 2000 and 2001") and you get real Landsat or Sentinel-2 imagery with a before/after swipe. The answer gives the measured change, a confidence level, a narrated story and sourced context, including the reported downsides.
+
+Every measured number comes from the change engine (`backend/change.py`). The local model only plans the question and narrates. A sentence it writes is shown only if all its numbers and proper names appear in the facts it was given.
 
 ## Run it (Windows)
 
@@ -12,7 +15,7 @@ First time, with internet:
 setup.bat
 ```
 
-`setup.bat` creates `.venv` (Python 3.12), installs `requirements.lock.txt`, copies `.env.example` to `.env`, and pulls `qwen2.5:7b-instruct-q4_K_M`. It needs Python 3.12 and Ollama (ollama.com) installed.
+`setup.bat` creates `.venv` (Python 3.12), installs `requirements.lock.txt`, copies `.env.example` to `.env`, and pulls `qwen2.5:7b-instruct-q4_K_M`. It needs Python 3.12 and Ollama (ollama.com).
 
 Every time, including on stage:
 
@@ -20,94 +23,109 @@ Every time, including on stage:
 start_demo.bat
 ```
 
-It starts Ollama, warms the model, starts the API on http://localhost:8000 and opens Chrome full screen.
+It starts Ollama, warms the model, starts the API on http://localhost:8000 and opens Chrome full screen. At startup the server also narrates the pitch stories once, so they replay instantly.
 
-- Shortcuts: `C` assistant, `/` question box, `S` swipe, `P` projector mode, `1` Palm 2001 to 2008, `2` UAE flood 2024, `3` Lake Mead, `Esc` closes dialogs.
-- The previous Leaflet UI is still at http://localhost:8000/legacy/.
-- Stage checklist: laptop on mains power, Windows power plan "Best performance", display scaling 100%, close Slack, Discord and Overwolf. Check `ollama ps` shows `100% GPU`.
+- **Shortcuts:** `Ctrl K` search, `/` ask, `C` assistant, `S` swipe, `T` tilt, `O` back to orbit, `P` projector, `1` Palm 2001 to 2008, `2` UAE flood 2024, `3` Lake Mead, `Esc` close.
+- **Globe:** the bottom-right controls are live satellites, tilt, north-up, zoom and back to orbit. The globe spins on its own after 20 s idle at orbit; turn that off under Layers.
+- **Legacy:** the original Leaflet UI is at `/legacy/`.
+- **Stage checklist:** mains power, Windows power plan "Best performance", display scaling 100%, close Slack, Discord and Overwolf, and check `ollama ps` shows `100% GPU`.
 
 ### Configuration (`.env`, never committed)
 
 | Key | Meaning |
 | --- | --- |
-| `ARCGIS_API_KEY` | Optional free ArcGIS developer key for Esri World Imagery. Without it the keyless public service is used. **In the ArcGIS dashboard, restrict the key by HTTP referrer to `http://localhost:8000/*`.** The key reaches the browser through `/api/config`. |
-| `LLM_MODEL` | `qwen2.5:7b-instruct-q4_K_M` (chosen by the bake-off below). |
-| `LLM_FALLBACK`, `LLM_SMALL` | Left empty on purpose. With the globe open on an 8 GB GPU only one model fits; a second model evicts the first and adds about 10 s to every answer. If the model is missing or slow, the app falls back to the rule router and fixed templates. |
-| `GEOCODE_UA` | User-Agent for Nominatim. Its policy wants contact details: set it to `AskTheSatellite-NOVA2026/1.0 (your team email)`. The placeholder `example.com` address is refused with HTTP 403. |
+| `ARCGIS_API_KEY` | Optional free ArcGIS developer key for Esri World Imagery. Without it the keyless service is used. Restrict the key by HTTP referrer (`http://localhost:8000/*`, plus your public URL). |
+| `LLM_MODEL` | `qwen2.5:7b-instruct-q4_K_M` (bake-off below). Empty means no model: rules, templates and recorded narrations only. |
+| `LLM_FALLBACK`, `LLM_SMALL` | Left empty on purpose. On an 8 GB GPU with the globe open, a second model evicts the first and adds about 10 s per answer. |
+| `GEOCODE_UA` | Nominatim User-Agent. Put a team contact email in it; the `example.com` placeholder gets HTTP 403. |
+| `ALLOW_LIVE` | `0` turns off live Sentinel-2 measuring (public demo host). Default `1`. |
+| `TRUST_PROXY` | `1` behind exactly one reverse proxy (Render). Visitor IPs for rate limits are then read from the proxy's own `X-Forwarded-For` hop. |
+| `PREWARM`, `THREADS`, `LIVE_CONCURRENCY`, `LIVE_TIMEOUT` | Start-up narration warm-up (default on), thread-pool size (400), parallel live jobs (1), live time-out in seconds (150). |
 
-### Refresh the data (internet needed)
+## Put it online (Render, free plan, pre-computed data, no model)
 
-```bat
-cd backend
-..\.venv\Scripts\python precompute.py lake_mead dubai_flood_2024 palm_jebel_ali palm_jumeirah
-..\.venv\Scripts\python precompute_frames.py
-```
+The repository includes a `Dockerfile` and a Render Blueprint (`render.yaml`). The public image runs:
+- with no language model; the pitch stories play back their recorded, guarded narrations;
+- with live measuring off;
+- with the place guide, search, satellites and all stories working.
 
-The first command caches the preset analyses. The second caches one frame per year for Palm Jumeirah, used by `/api/compare`.
+1. Render dashboard: New, then Blueprint, then pick this GitHub repository, then Apply.
+2. Optional: add `ARCGIS_API_KEY`, and restrict it in the ArcGIS dashboard to the `onrender.com` URL.
+3. The free plan sleeps after 15 minutes idle; the first visit after that takes about a minute.
 
-### Checks
+## Built for a burst of visitors
 
-```bat
-.venv\Scripts\python tests\contract_test.py
-```
-
-Needs the server running. It checks the API contract, the additive routes, and that every number in the cards is in `analysis.stats`.
-
-- `backend\bench_llm.py <model>`: the planner bake-off.
-- `tools\shots.js`: headless-Chrome screenshots. Run `npm i playwright-core` next to it first.
+- **Stories cost almost nothing.** Pre-computed analyses, frame comparisons and narrations are served from disk and memory: a shared narration file, an in-memory cache for PNG and JSON with ETag/304, and Cache-Control on static assets.
+- **No duplicate work.** Many people asking the same thing at once trigger one model call, one Wikipedia lookup and one geocode; the rest wait for it and replay.
+- **Expensive paths are gated.** One live raster job at a time (queue of 3, then a friendly "busy" card). One model call at a time; if the model is busy for more than 2.5 s, the answer goes out without the story. A 400-thread pool means streaming answers never starve static files.
+- **Per-visitor rate limits.** Chat 20 burst then 40 a minute; search 30 burst then 4 a second. These answer with a friendly card or HTTP 429, never a stack trace. Limits are per worker process.
+- **Measured** (`tests/load_test.py`, this laptop, 4 workers, 3,000 visitors arriving 160 at a time, 7 requests each including a full streamed story answer):
+  - 21,000 requests in 36.8 s (571 requests/s), **0 errors**.
+  - Story answer complete: p50 136 ms, p95 253 ms.
+  - Page: p95 247 ms.
+  - Config: p95 196 ms.
+  - Image layers: p50 122 ms. The p95 of 2.4 s is the 4 MB Lake Mead images.
 
 ## What is measured, and how
 
-- **Indices**: MNDWI for water (threshold 0), NDVI for vegetation (0.3), an MNDWI flood rule, and dNBR for burns. Change is a **class flip** between two dates on one EPSG:3857 grid. Area is corrected by cos²(latitude). Blobs under 5 pixels are dropped and their area is reported.
-- **Masks**: Sentinel-2 SCL classes 0, 1, 3, 8, 9 and 10. Landsat QA_PIXEL bits 0–4. Landsat 7 stripe gaps count as no data. A pixel that could not be read is never drawn as "no change": it is grey hatching.
-- **Confidence badge**:
+- **Indices:** MNDWI for water (threshold 0), NDVI for vegetation (0.3), an MNDWI flood rule, and dNBR for burns. Change is a class flip between two dates on one EPSG:3857 grid. Area is corrected by cos²(latitude). Blobs under 5 pixels are dropped and reported.
+- **Masks:** Sentinel-2 SCL 0, 1, 3, 8, 9, 10 and Landsat QA_PIXEL bits 0–4. Landsat 7 stripe gaps count as no data. Unreadable pixels are grey hatching, never "no change".
+- **Confidence:**
   - HIGH: at least 85% valid on both dates.
-  - MEDIUM: 60–85% valid, or one downgrade.
-  - LOW: under 60% valid, or two downgrades.
+  - MEDIUM: 60–85%, or one downgrade.
+  - LOW: under 60%, or two downgrades.
   - One downgrade each for a sensor-family change and for a season gap over 45 days.
   - Under 50% valid, the km² headline is hidden.
-- **History bank** (`backend/cache/frames/palm_jumeirah/`):
-  - 2000-05-19, 2001-05-22 and 2003-05-28 (Landsat 7).
-  - 2008-05-17 (Landsat 5).
-  - 2018-01-14 and 2024-01-23 (Sentinel-2B, resampled to the same 30 m grid).
-  - Dropped: 2002 (only 51.7% valid). 2004, 2005 and 2006 (Planetary Computer has no Landsat 5 scene over Dubai for April–June in those years).
-- **Validation**: our Lake Mead water areas are 316.9 km² (14 Aug 2019) and 264.9 km² (7 Sep 2022). The published tutorial benchmark gives 324.1 and 267.1 km² (−2.2% and −0.8%). This is not ground truth.
+- **Palm history bank:**
+  - 2000, 2001 and 2003 (Landsat 7); 2008 (Landsat 5); Jan 2018 and Jan 2024 (Sentinel-2B, on the same 30 m grid).
+  - Dropped: 2002 (51.7% valid), and 2004–2006 (no Landsat 5 scene for April–June in Planetary Computer).
+- **Validation:** Lake Mead water 316.9 and 264.9 km² against the published benchmark's 324.1 and 267.1 km² (−2.2% and −0.8%). This is not ground truth.
 
-## LLM bake-off (12 Nov 2026, RTX 4060 Laptop 8 GB, globe open on Palm at the same time)
+## The assistant
 
-| Model | Valid JSON | Correct plan (grounded) | Plan p50 / p95 | Interpretation p50 | VRAM | `ollama ps` |
+- **Two modes, chosen by rules.** A change question (years, compare, before/after, flood, shrink, and the like) gets a measurement. Anything else that names a place gets the explore card.
+- **Planner.** The rule router answers first (0 ms). The model refines the plan only when the rules are unsure, and it may not:
+  - tie a different place to a story;
+  - re-explain the previous map (only the rules can choose that);
+  - overrule a place the rules found.
+- **Narration guard** (`backend/narrate.py`). Text streams sentence by sentence. A sentence is dropped unless every number and every capitalised name in it appears in the facts the model was given (the measurement and the named sources, or Wikipedia). Claims about the measurement may not be credited to a news source.
+- **Search.** Type-ahead from GeoNames (Open-Meteo geocoding API), with Photon as backup and the stories first. Picking a result flies there and opens its place card.
+
+## LLM bake-off (12 Nov 2026, RTX 4060 Laptop 8 GB, globe open)
+
+| Model | Valid JSON | Correct plan | Plan p50 / p95 | Interpretation p50 | VRAM | `ollama ps` |
 | --- | --- | --- | --- | --- | --- | --- |
 | qwen2.5:7b-instruct-q4_K_M | 30/30 | 27/30 | 1.90 / 2.43 s | 1.65 s | 4.6 GB | 100% GPU |
 | qwen3.5:9b-q4_K_M | 30/30 | 27/30 | 2.51 / 3.03 s | 1.59 s | 5.5 GB | 100% GPU |
 | qwen3.5:4b | 30/30 | 27/30 | 1.34 / 1.51 s | 0.81 s | 3.1 GB | 100% GPU |
 
-The 7B was kept. The 9B is no more accurate, is slower, and leaves the least VRAM headroom beside Chrome. Known gap: a cold 7B load takes longer than the 6 s chat timeout, so the server warms it at start-up and so does `start_demo.bat`.
-
 **No model training was performed.**
 
 ## Limits
 
-- Optical imagery only: clouds hide the ground and smoke and haze lower confidence. Radar (Sentinel-1) is the next step.
-- Live analysis needs internet and covers Sentinel-2, 2016 to today. Pre-2016 history is the cached Landsat bank and the cached presets.
-- The Esri basemap is current, mixed-date imagery. It is context only and never analysed. Its native detail over Dubai ends at zoom level 19. Above that the "Beyond native imagery detail" chip shows.
-- Offline: the globe uses the bundled Natural Earth II texture. Presets, frames and chat about cached places work. Esri tiles are never cached or prefetched.
-- Curated context is attributive ("reported", "according to") and sourced. Disputed claims are labelled.
+- Optical imagery only: clouds hide the ground. Radar (Sentinel-1) is the next step.
+- Live analysis needs internet and covers Sentinel-2, 2016 to today. Pre-2016 history is the cached Landsat bank and the stories.
+- Esri imagery is current and mixed-date: context only, never analysed. Deeper zoom levels (up to 23) load only where Esri's tilemap reports imagery; elsewhere the "Beyond native imagery detail" chip shows.
+- Place notes and guides come from Wikipedia and can be incomplete. The guide's model is held to Wikipedia's facts, not to the truth of the world.
+- Offline: NASA Blue Marble and Natural Earth globe, stories, frames and recorded narrations. No place search, no Esri tiles; Esri tiles are never cached.
 
 ## Licences and attribution
 
-See [DATA_SOURCES.md](DATA_SOURCES.md) for every data source and its terms.
+See [DATA_SOURCES.md](DATA_SOURCES.md).
 
-- CesiumJS 1.147.0: Apache-2.0 (`web/vendor/cesium/LICENSE.md`). No Cesium ion, no Google or Bing imagery.
+- CesiumJS 1.147.0: Apache-2.0.
+- satellite.js 7.2.0: MIT (`web/vendor/satellite/LICENSE.md`).
 - Leaflet 1.9.4 (legacy page): BSD-2-Clause.
-- Inter and JetBrains Mono: SIL Open Font License 1.1 (`web/vendor/fonts/`).
+- IBM Plex Sans, Mono and Sans Arabic: SIL Open Font License 1.1 (`web/vendor/fonts/`).
+- NASA Blue Marble textures: public domain, credit NASA Earth Observatory.
 - Python packages: see `requirements.lock.txt`. FastAPI and pydantic are MIT; numpy and scipy are BSD; rasterio is BSD-3; pystac-client and odc-stac are Apache-2.0.
-- UI inspired by God's Eye View (MIT), https://github.com/bilawalsidhu/gods-eye-view. Inspiration only: no code from it is used or vendored.
+- UI inspired by God's Eye View (MIT), https://github.com/bilawalsidhu/gods-eye-view. Inspiration only: no code from it is used.
 
 ## Open organiser questions (research §0b)
 
-These are still unresolved. Confirm them on the day:
-- Is the deadline noon Friday or midnight?
+Still unresolved; confirm them on the day:
+- Is the deadline noon or midnight?
 - May anything change after submission?
 - What must the submission contain?
 
-The plan assumes submission at 11:30 from tag `v1.0-submission`.
+Tags: `v1.0-submission` (first freeze), `v1.1` (this version).

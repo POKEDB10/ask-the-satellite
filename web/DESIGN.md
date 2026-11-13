@@ -11,7 +11,7 @@ Feel: quiet Google-Earth chrome plus Linear-style restraint. The globe is the he
 - No gradients on text or surfaces. Glow only on the globe atmosphere (Cesium's).
 
 ## Type
-- Inter 400/500/600 (local woff2), with a system-ui fallback. JetBrains Mono 400/500 for data, ids and eyebrows.
+- IBM Plex Sans 400/500/600 for UI and reading, IBM Plex Mono 400/500 for data and eyebrows, IBM Plex Sans Arabic for Arabic (local woff2, system fallbacks).
 - Scale: 11 (mono eyebrow, uppercase, +0.08em), 12 (meta, chips), 13 (body), 15 (titles), 20 (figures), 28 (projector headline).
 - Data uses `font-variant-numeric: tabular-nums`.
 

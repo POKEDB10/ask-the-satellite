@@ -1,0 +1,14 @@
+.git
+.venv
+.env
+.claude
+logs
+docs
+reference
+reports
+tests
+tools
+backend/cache/live
+backend/cache/geocode
+backend/cache/_tmp
+**/__pycache__

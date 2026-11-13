@@ -192,10 +192,12 @@ def wiki(name, center):
                 main = s                                                    # the article must be about THIS place, not a constituency
                 break
         near = _nearby(main["center"] if main and main.get("center") else center)   # the city's own centre, not the region's
-        if not main and near:
-            main = _summary(near[0]["title"])
-        near = [n for n in near if not main or n["title"] != main["title"]]
         good = [n for n in near if not BORING.search(f"{n['title']} {n.get('description') or ''}") and n.get("extract")]
+        if not main and good:                                        # no article for the name: the most-read real place nearby
+            main = _summary(good[0]["title"])
+        good = [n for n in good if not main or n["title"] != main["title"]]
+        if not main and not good:
+            return None                                              # likely a transient upstream error: do not cache emptiness
         return dict(main=main, nearby=good[:6])
     try:
         return _wiki_cache.get(key, fetch)
