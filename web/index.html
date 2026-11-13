@@ -112,9 +112,12 @@
   <aside class="chat" id="chat" aria-label="Satellite assistant">
     <div class="chat-head">
       <div><div class="chat-title">Assistant</div><div class="chat-sub" id="chatSub">Connecting…</div></div>
-      <button class="x mobile-close" id="chatClose" aria-label="Close assistant"><svg class="ico"><use href="#i-close"/></svg></button>
+      <div class="head-tools">
+        <button class="instr-toggle" id="instrToggle" type="button" aria-expanded="false" aria-controls="instr">Dates &amp; index<svg class="ico" viewBox="0 0 16 16"><path d="m4 6 4 4 4-4"/></svg></button>
+        <button class="x mobile-close" id="chatClose" aria-label="Close assistant"><svg class="ico"><use href="#i-close"/></svg></button>
+      </div>
     </div>
-    <form class="instr" id="instr" role="group" aria-label="Compare two observation periods">
+    <form class="instr" id="instr" role="group" aria-label="Compare two observation periods" hidden>
       <label class="f reg"><span>Region</span><select id="sel-region" aria-label="Region"></select></label>
       <label class="f ix"><span>Index</span><select id="sel-index" aria-label="Spectral index"></select></label>
       <label class="f"><span>Date 1 · before</span><select id="sel-y1" aria-label="Before date"></select></label>

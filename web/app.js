@@ -242,6 +242,7 @@
           lbl.textContent = d.label;
         } else if (ev === 'place') {
           place = d;
+          autoInstr(false);
           if (Globe.state.analysis) Globe.hideAnalysis();
           body.insertAdjacentHTML('beforeend', placeHtml(d));
           pinTop();
@@ -532,10 +533,21 @@
     } else ask(STORY_MSG[pid] || regionName(pid), pid);
   }
 
+  // The bar starts closed. It opens by itself only for pre-computed (story) analyses, and closes again for anything else
+  // unless the user opened it themselves.
+  let instrMine = false;
+  function showInstr(v, mine = false) {
+    $('#instr').hidden = !v; $('#instrToggle').setAttribute('aria-expanded', v);
+    instrMine = v && mine;
+  }
+  $('#instrToggle').onclick = () => showInstr($('#instr').hidden, true);
+  const autoInstr = pre => { if (pre) showInstr(true, instrMine); else if (!instrMine) showInstr(false); };
+
   function syncSelectors(a) {
     const m = /^presets:([a-z0-9_]+?)(?:__(\d{4})_(\d{4})(?:_([a-z]+))?)?$/.exec(a.analysis_id || '');
-    if (!m || ![...SEL.region.options].some(o => o.value === m[1])) return;
-    fillRegion(m[1], m[2], m[3], m[4] || a.index).catch(() => {});
+    const pre = !!m && [...SEL.region.options].some(o => o.value === m[1]);
+    autoInstr(pre);
+    if (pre) fillRegion(m[1], m[2], m[3], m[4] || a.index).catch(() => {});
   }
 
   SEL.region.addEventListener('change', () => fillRegion(SEL.region.value).then(runSelectors).catch(() => {}));

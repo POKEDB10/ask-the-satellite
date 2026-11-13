@@ -150,6 +150,12 @@ input[type=checkbox],input[type=radio]{accent-color:var(--acc);width:14px;height
 .chat-sub .dot{width:6px;height:6px;border-radius:50%;background:var(--fg-3)}
 .chat-sub .dot.on{background:var(--hi)}.chat-sub .dot.off{background:var(--lo)}
 .mobile-close{display:none}
+.head-tools{display:flex;align-items:center;gap:4px}
+.instr-toggle{display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 8px;border-radius:8px;color:var(--fg-2);font-size:12.5px}
+.instr-toggle:hover{color:var(--fg);background:var(--bg-2)}
+.instr-toggle .ico{width:14px;height:14px;transition:transform .16s var(--ease)}
+.instr-toggle[aria-expanded=true]{color:var(--fg)}
+.instr-toggle[aria-expanded=true] .ico{transform:rotate(180deg)}
 .log{flex:1;overflow-y:auto;overflow-x:hidden;padding:22px 22px 8px;min-width:340px;overscroll-behavior:contain}
 .log::-webkit-scrollbar{width:8px}.log::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:4px}
 .empty h2{margin:6px 0 10px;font:400 27px/1.2 var(--serif);letter-spacing:-.01em}
